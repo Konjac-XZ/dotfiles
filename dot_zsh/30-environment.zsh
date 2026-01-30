@@ -21,3 +21,6 @@ export ANTHROPIC_BASE_URL="http://192.168.31.236:3001"
 # Tool-specific settings
 export PROTOCOL_GUARD_SQLITE_DATABASE=/root/ProtocolGuard-Database/sqlite_uFTPD.db
 export ENABLE_TOOL_SEARCH=true
+
+export https_proxy="http://10.108.250.1:63333"
+export http_proxy="http://10.108.250.1:63333"

@@ -64,21 +64,21 @@ function aria2d() {
 }
 
 # History synchronization for autosuggestions
-autoload -Uz add-zsh-hook
-zmodload -F zsh/stat b:zstat 2>/dev/null
+# autoload -Uz add-zsh-hook
+# zmodload -F zsh/stat b:zstat 2>/dev/null
 
-typeset -g _HIST_MTIME=0
+# typeset -g _HIST_MTIME=0
 
-_sync_hist_for_autosuggest() {
-  [[ -o interactive ]] || return
+# _sync_hist_for_autosuggest() {
+#   [[ -o interactive ]] || return
 
-  local -a st
-  if zstat -A st +mtime -- "$HISTFILE" 2>/dev/null; then
-    (( st[1] == _HIST_MTIME )) && return
-    _HIST_MTIME=$st[1]
-  fi
+#   local -a st
+#   if zstat -A st +mtime -- "$HISTFILE" 2>/dev/null; then
+#     (( st[1] == _HIST_MTIME )) && return
+#     _HIST_MTIME=$st[1]
+#   fi
 
-  fc -R
-}
+#   fc -R
+# }
 
-add-zsh-hook precmd _sync_hist_for_autosuggest
+# add-zsh-hook precmd _sync_hist_for_autosuggest
