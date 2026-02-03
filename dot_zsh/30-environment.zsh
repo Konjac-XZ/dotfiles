@@ -13,7 +13,6 @@ export LC_ALL=en_US.UTF-8
 export AFL_DEBUG=1
 export AFL_SKIP_CRASHES=1
 export AFL_FAST_CAL=1
-export AFL_DONT_OPTIMIZE=1
 
 # API base URLs
 export OPENAI_BASE_URL="http://192.168.31.236:3001/v1"
