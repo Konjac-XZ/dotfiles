@@ -14,3 +14,5 @@ eval "$(direnv hook zsh)"
 # fzf
 source <(fzf --zsh)
 
+# Homebrew
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"

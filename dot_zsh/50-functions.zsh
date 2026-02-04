@@ -91,7 +91,13 @@ function path() {
 
 function cf() {
   local file
-  file=$(fd --color=never -t f "$@" | fzf -1 -0 --prompt="Navigate to > ")
+  if [[ $# -eq 1 ]]; then
+    file=$(fd --color=never -t f "$1" . | fzf -1 -0 --prompt="Navigate to > ")
+  elif [[ $# -ge 2 ]]; then
+    file=$(fd --color=never -t f "$1" "$2" | fzf -1 -0 --prompt="Navigate to > ")
+  else
+    file=$(fd --color=never -t f | fzf -1 -0 --prompt="Navigate to > ")
+  fi
 
   if [[ -n "$file" ]]; then
     local target_dir
