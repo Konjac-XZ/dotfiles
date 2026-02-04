@@ -10,3 +10,7 @@ export NVM_DIR="$HOME/.nvm"
 
 # Direnv hook
 eval "$(direnv hook zsh)"
+
+# fzf
+source <(fzf --zsh)
+
