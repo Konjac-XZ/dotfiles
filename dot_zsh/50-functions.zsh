@@ -82,3 +82,20 @@ function aria2d() {
 # }
 
 # add-zsh-hook precmd _sync_hist_for_autosuggest
+
+path() {
+  # Use a local counter for line numbers
+  local i=1
+  
+  # Iterate through the zsh $path array
+  for p in $path; do
+    if [[ -d "$p" ]]; then
+      # Existing directory: Green checkmark
+      printf "%2d. \e[32m[✓]\e[0m %s\n" "$i" "$p"
+    else
+      # Missing directory: Red cross
+      printf "%2d. \e[31m[✗]\e[0m %s\n" "$i" "$p"
+    fi
+    ((i++))
+  done
+}

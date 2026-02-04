@@ -8,8 +8,5 @@ export NVM_DIR="$HOME/.nvm"
 # Bun
 [ -s "/root/.bun/_bun" ] && source "/root/.bun/_bun"
 
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-
 # Direnv hook
 eval "$(direnv hook zsh)"

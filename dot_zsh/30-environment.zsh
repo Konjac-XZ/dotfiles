@@ -1,7 +1,19 @@
 # Environment variables
 
+# XDG Config configuration
+export XDG_CONFIG_HOME="$HOME/.config"
+
 # PATH configuration
-export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"
+# Function to add a directory to PATH only if it's not already present
+add_to_path() {
+    if [[ -d "$1" ]] && [[ ":$PATH:" != *":$1:"* ]]; then
+        export PATH="$1:$PATH"
+    fi
+}
+
+add_to_path "$HOME/go/bin"
+add_to_path "$HOME/.local/bin"
+
 export IS_SANDBOX=1
 
 # Locale settings
@@ -22,5 +34,6 @@ export ANTHROPIC_BASE_URL="http://192.168.31.236:3001"
 export PROTOCOL_GUARD_SQLITE_DATABASE=/root/ProtocolGuard-Database/sqlite_uFTPD.db
 export ENABLE_TOOL_SEARCH=true
 
+# Network and proxy settings
 export https_proxy="http://10.108.250.1:63333"
 export http_proxy="http://10.108.250.1:63333"
