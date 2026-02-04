@@ -63,27 +63,16 @@ function aria2d() {
     fi
 }
 
-# History synchronization for autosuggestions
-# autoload -Uz add-zsh-hook
-# zmodload -F zsh/stat b:zstat 2>/dev/null
-
-# typeset -g _HIST_MTIME=0
-
-# _sync_hist_for_autosuggest() {
-#   [[ -o interactive ]] || return
-
-#   local -a st
-#   if zstat -A st +mtime -- "$HISTFILE" 2>/dev/null; then
-#     (( st[1] == _HIST_MTIME )) && return
-#     _HIST_MTIME=$st[1]
-#   fi
-
-#   fc -R
-# }
-
-# add-zsh-hook precmd _sync_hist_for_autosuggest
-
-path() {
+function path() {
+  # Check for --raw or -r flag
+  if [[ "$1" == "--raw" || "$1" == "-r" ]]; then
+    # Print all paths without checks or numbering
+    for p in $path; do
+      printf "%s\n" "$p"
+    done
+    return
+  fi
+  
   # Use a local counter for line numbers
   local i=1
   
