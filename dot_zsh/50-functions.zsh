@@ -88,3 +88,16 @@ function path() {
     ((i++))
   done
 }
+
+function cf() {
+  local file
+  file=$(fd --color=never -t f "$@" | fzf -1 -0 --prompt="Navigate to > ")
+
+  if [[ -n "$file" ]]; then
+    local target_dir
+    target_dir=$(dirname "$file")
+    cd "$target_dir" && ls -p
+  else
+    [[ -n "$*" ]] && echo "No matches found for: $*"
+  fi
+}
