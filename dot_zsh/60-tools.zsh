@@ -1,5 +1,8 @@
 # Tool initializations
 
+# Homebrew
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"
+
 # NVM (Node Version Manager)
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -8,14 +11,11 @@ export NVM_DIR="$HOME/.nvm"
 # Bun
 [ -s "/root/.bun/_bun" ] && source "/root/.bun/_bun"
 
-# Direnv hook
+# Direnv 
 eval "$(direnv hook zsh)"
 
 # fzf
 source <(fzf --zsh)
-
-# Homebrew
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"
 
 # zoxide
 eval "$(zoxide init zsh)"
