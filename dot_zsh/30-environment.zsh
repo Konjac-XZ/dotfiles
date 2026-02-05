@@ -5,7 +5,7 @@ export XDG_CONFIG_HOME="$HOME/.config"
 
 # PATH configuration
 # Function to add a directory to PATH only if it's not already present
-add_to_path() {
+function add_to_path() {
     if [[ -d "$1" ]] && [[ ":$PATH:" != *":$1:"* ]]; then
         export PATH="$1:$PATH"
     fi
