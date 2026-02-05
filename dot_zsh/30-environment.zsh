@@ -35,5 +35,4 @@ export PROTOCOL_GUARD_SQLITE_DATABASE=/root/ProtocolGuard-Database/sqlite_uFTPD.
 export ENABLE_TOOL_SEARCH=true
 
 # Network and proxy settings
-export https_proxy="http://10.108.250.1:63333"
-export http_proxy="http://10.108.250.1:63333"
+[ -f "$HOME/.config/proxy.env" ] && . "$HOME/.config/proxy.env"
