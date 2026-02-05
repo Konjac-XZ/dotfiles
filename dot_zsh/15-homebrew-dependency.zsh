@@ -1,7 +1,9 @@
 # Homebrew
 if [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null; then
   # User is root or has sudo privileges - load full brew environment
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"
+  if ! command -v brew >/dev/null 2>&1; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"
+  fi
 else
   # No sudo privileges - just add brew to PATH if needed
   if ! command -v brew >/dev/null 2>&1; then
