@@ -4,8 +4,8 @@ set -euo pipefail
 
 # ---- Check for sudo privileges ----
 if ! sudo -n true 2>/dev/null; then
-  echo "[chezmoi] ERROR: This script requires sudo privileges. Please run 'sudo -v' first or ensure you have sudo access." >&2
-  exit 1
+  echo "[chezmoi] INFO: Sudo privileges not available. Skipping package installation."
+  exit 0
 fi
 
 # ---- Activate Homebrew without relying on .zshrc ----
