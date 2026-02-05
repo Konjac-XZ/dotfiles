@@ -1,0 +1,11 @@
+packages:
+  linux:
+    brews:
+      - "bat"
+      - "direnv"
+      - "eza"
+      - "fd"
+      - "fzf"
+      - "ripgrep"
+      - "zoxide"
+    casks: []
