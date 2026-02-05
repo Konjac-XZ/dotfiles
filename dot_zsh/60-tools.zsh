@@ -16,3 +16,6 @@ source <(fzf --zsh)
 
 # Homebrew
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"
+
+# zoxide
+eval "$(zoxide init zsh)"

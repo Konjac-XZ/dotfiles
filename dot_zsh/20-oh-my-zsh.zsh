@@ -12,7 +12,13 @@ zstyle ':omz:update' mode reminder
 zstyle ':omz:update' frequency 7
 
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-z)
+plugins=( \
+gitfast \
+zsh-autosuggestions zsh-syntax-highlighting \
+sudo \
+fzf-tab fzf \
+extract \
+)
 
 source $ZSH/oh-my-zsh.sh
 
