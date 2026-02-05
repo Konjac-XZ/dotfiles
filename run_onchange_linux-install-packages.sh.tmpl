@@ -2,18 +2,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v brew >/dev/null 2>&1; then
-  echo "[chezmoi] Homebrew not found; skipping brew packages." >&2
+# ---- Activate Homebrew without relying on .zshrc ----
+BREW=""
+for b in \
+  "$(command -v brew 2>/dev/null || true)" \
+  /home/linuxbrew/.linuxbrew/bin/brew \
+  "$HOME/.linuxbrew/bin/brew" \
+  /opt/homebrew/bin/brew \
+  /usr/local/bin/brew
+do
+  if [ -n "${b:-}" ] && [ -x "$b" ]; then
+    BREW="$b"
+    break
+  fi
+done
+
+if [ -z "$BREW" ]; then
+  echo "[chezmoi] brew not found (non-interactive run); skipping package install." >&2
   exit 0
 fi
 
-# Ensure `brew bundle` exists (provided by homebrew/bundle tap on some installs)
+# Put brew + its paths into this process environment
+eval "$("$BREW" shellenv)"
+
+# Ensure brew bundle exists
 if ! brew help bundle >/dev/null 2>&1; then
   brew tap homebrew/bundle
 fi
 
-# Install declared packages (no automatic upgrades unless you change the list)
-brew bundle --no-upgrade --file=/dev/stdin <<EOF
+# ---- Install declared packages ----
+brew bundle --no-upgrade --file=/dev/stdin <<'EOF'
 {{- range .packages.linux.brews }}
 brew {{ . | quote }}
 {{- end }}
