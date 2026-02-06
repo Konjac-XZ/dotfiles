@@ -8,4 +8,7 @@ packages:
       - "fzf"
       - "ripgrep"
       - "zoxide"
+      - "aria2"
+      - "btop"
+      - "tmux"
     casks: []
