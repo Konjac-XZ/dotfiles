@@ -18,7 +18,9 @@ zsh-autosuggestions zsh-syntax-highlighting \
 sudo \
 fzf-tab fzf \
 extract \
+zsh-ssh-config-suggestions \
 )
+
 
 source $ZSH/oh-my-zsh.sh
 
