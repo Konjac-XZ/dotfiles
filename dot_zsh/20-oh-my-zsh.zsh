@@ -17,6 +17,7 @@ zstyle ':omz:update' frequency 7
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 plugins=(
 gitfast
+multipass
 sudo
 fzf
 extract
