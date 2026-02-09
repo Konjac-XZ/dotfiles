@@ -1,5 +1,8 @@
 # Oh-My-Zsh configuration
 
+# Skip Oh-My-Zsh and plugin loading in non-interactive shells.
+[[ "${IS_INTERACTIVE_SHELL:-0}" -eq 1 ]] || return 0
+
 export TERM="xterm-256color"
 
 export ZSH="$HOME/.oh-my-zsh"
@@ -12,14 +15,19 @@ zstyle ':omz:update' mode reminder
 zstyle ':omz:update' frequency 7
 
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-plugins=( \
-zsh-ssh \
-gitfast \
-zsh-autosuggestions zsh-syntax-highlighting \
-sudo \
-fzf-tab fzf \
-extract \
+plugins=(
+gitfast
+sudo
+fzf
+extract
+uv
+tmux
 )
+
+load_third_party_plugin "zsh-ssh"
+load_third_party_plugin "zsh-autosuggestions"
+load_third_party_plugin "zsh-syntax-highlighting"
+load_third_party_plugin "fzf-tab"
 
 
 source $ZSH/oh-my-zsh.sh
