@@ -34,14 +34,5 @@ function corepack() {
   corepack "$@"
 }
 
-# Bun
-[ -s "/root/.bun/_bun" ] && source "/root/.bun/_bun"
-
 # Skip interactive hooks in non-interactive shells.
 [[ "${IS_INTERACTIVE_SHELL:-0}" -eq 1 ]] || return 0
-
-# Direnv 
-eval "$(direnv hook zsh)"
-
-# zoxide
-eval "$(zoxide init zsh)"

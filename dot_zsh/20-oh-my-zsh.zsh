@@ -22,6 +22,8 @@ fzf
 extract
 uv
 tmux
+zoxide
+direnv
 )
 
 load_third_party_plugin "zsh-ssh"
