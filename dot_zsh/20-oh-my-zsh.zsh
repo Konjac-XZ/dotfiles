@@ -13,12 +13,12 @@ zstyle ':omz:update' frequency 7
 
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 plugins=( \
+zsh-ssh \
 gitfast \
 zsh-autosuggestions zsh-syntax-highlighting \
 sudo \
 fzf-tab fzf \
 extract \
-zsh-ssh-config-suggestions \
 )
 
 
