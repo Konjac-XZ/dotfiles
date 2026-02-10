@@ -3,6 +3,12 @@ set -eu
 
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
+# If oh-my-zsh isn't installed, run the official installer
+if [ ! -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+  echo "oh-my-zsh not found in $HOME/.oh-my-zsh. Installing..."
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+fi
+
 clone_if_missing() {
   repo="$1"
   target="$2"
