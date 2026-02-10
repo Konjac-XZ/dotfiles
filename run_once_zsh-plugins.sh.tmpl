@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+set -eu
+
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+clone_if_missing() {
+  repo="$1"
+  target="$2"
+
+  if [ ! -e "$target" ]; then
+    mkdir -p "$(dirname "$target")"
+    git clone "$repo" "$target"
+  fi
+}
+
+clone_if_missing "https://github.com/romkatv/powerlevel10k.git" "$ZSH_CUSTOM/themes/powerlevel10k"
+clone_if_missing "https://github.com/zsh-users/zsh-autosuggestions" "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+clone_if_missing "https://github.com/zsh-users/zsh-syntax-highlighting.git" "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+clone_if_missing "https://github.com/Aloxaf/fzf-tab" "$ZSH_CUSTOM/plugins/fzf-tab"
+clone_if_missing "https://github.com/sunlei/zsh-ssh" "$ZSH_CUSTOM/plugins/zsh-ssh"
