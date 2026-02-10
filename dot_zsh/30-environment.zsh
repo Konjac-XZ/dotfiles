@@ -20,7 +20,7 @@ export AFL_FAST_CAL=1
 
 # API base URLs
 export OPENAI_BASE_URL="http://192.168.31.236:3001/v1"
-export ANTHROPIC_BASE_URL="http://192.168.31.236:3001"
+export ANTHROPIC_BASE_URL="http://10.102.32.6:47860"
 
 # Tool-specific settings
 export PROTOCOL_GUARD_SQLITE_DATABASE=/root/ProtocolGuard-Database/sqlite_uFTPD.db

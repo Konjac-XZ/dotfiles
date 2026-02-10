@@ -1,43 +1,49 @@
 {{- if eq .chezmoi.os "linux" -}}
 #!/usr/bin/env bash
-set -euo pipefail
+set -u
 
-# ---- Check for sudo privileges ----
-if ! sudo true 2>/dev/null; then
-  echo "[chezmoi] INFO: Sudo privileges not available. Skipping package installation."
+LINUXBREW_ROOT="/home/linuxbrew/.linuxbrew"
+
+# ---- Ensure only the Linuxbrew owner runs this ----
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+  echo "[chezmoi] INFO: Root user detected. Skipping Homebrew package installation."
+  exit 0
+fi
+
+if [ ! -d "$LINUXBREW_ROOT" ]; then
+  echo "[chezmoi] INFO: $LINUXBREW_ROOT not found. Skipping Homebrew package installation."
+  exit 0
+fi
+
+LINUXBREW_OWNER_UID="$(stat -c '%u' "$LINUXBREW_ROOT" 2>/dev/null || true)"
+if [ -z "$LINUXBREW_OWNER_UID" ] || [ "${EUID:-$(id -u)}" -ne "$LINUXBREW_OWNER_UID" ]; then
+  echo "[chezmoi] INFO: Current user is not the Linuxbrew owner. Skipping Homebrew package installation."
   exit 0
 fi
 
 # ---- Activate Homebrew without relying on .zshrc ----
-BREW=""
-for b in \
-  "$(command -v brew 2>/dev/null || true)" \
-  /home/linuxbrew/.linuxbrew/bin/brew \
-  "$HOME/.linuxbrew/bin/brew" \
-  /opt/homebrew/bin/brew \
-  /usr/local/bin/brew
-do
-  if [ -n "${b:-}" ] && [ -x "$b" ]; then
-    BREW="$b"
-    break
-  fi
-done
+BREW="$LINUXBREW_ROOT/bin/brew"
 
-if [ -z "$BREW" ]; then
-  echo "[chezmoi] brew not found (non-interactive run); skipping package install." >&2
+if [ ! -x "$BREW" ]; then
+  echo "[chezmoi] INFO: brew not found under $LINUXBREW_ROOT; skipping package installation."
   exit 0
 fi
 
 # Put brew + its paths into this process environment
-eval "$("$BREW" shellenv)"
+BREW_ENV="$($BREW shellenv 2>/dev/null || true)"
+if [ -z "$BREW_ENV" ]; then
+  echo "[chezmoi] INFO: Failed to initialize brew environment. Skipping package installation."
+  exit 0
+fi
+eval "$BREW_ENV"
 
 # Ensure brew bundle exists
 if ! brew help bundle >/dev/null 2>&1; then
-  brew tap homebrew/bundle
+  brew tap homebrew/bundle >/dev/null 2>&1 || true
 fi
 
 # ---- Install declared packages ----
-brew bundle --no-upgrade --file=/dev/stdin <<'EOF'
+brew bundle --no-upgrade --file=/dev/stdin >/dev/null 2>&1 <<'EOF'
 {{- range .packages.linux.brews }}
 brew {{ . | quote }}
 {{- end }}
