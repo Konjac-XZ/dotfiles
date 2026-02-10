@@ -9,7 +9,7 @@ clone_if_missing() {
 
   if [ ! -e "$target" ]; then
     mkdir -p "$(dirname "$target")"
-    git clone "$repo" "$target"
+    git clone --depth 1 --single-branch "$repo" "$target"
   fi
 }
 
