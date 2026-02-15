@@ -11,4 +11,5 @@ packages:
       - "aria2"
       - "btop"
       - "tmux"
+      - "yazi"
     casks: []
