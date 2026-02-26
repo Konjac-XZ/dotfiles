@@ -11,6 +11,6 @@ function claude() {
 }
 
 function codex() {
-  local flag="--yolo"
-  (( $@[(I)$flag] )) && command codex "$@" || command codex "$@" "$flag"
+  (( $@[(I)--yolo] || $@[(I)--dangerously-bypass-approvals-and-sandbox] )) \
+    && command codex "$@" || command codex "$@" --yolo
 }
