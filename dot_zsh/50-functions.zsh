@@ -108,6 +108,14 @@ function cf() {
   fi
 }
 
+function os() {
+  if [ $# -gt 0 ]; then
+    printf '\033]52;c;%s\a' "$(printf '%s' "$1" | base64)"
+  else
+    printf '\033]52;c;%s\a' "$(base64)"
+  fi
+}
+
 function y() {
 	local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
 	command yazi "$@" --cwd-file="$tmp"
