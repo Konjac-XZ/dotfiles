@@ -14,3 +14,8 @@ function codex() {
   (( $@[(I)--yolo] || $@[(I)--dangerously-bypass-approvals-and-sandbox] )) \
     && command codex "$@" || command codex "$@" --yolo
 }
+
+function gemini() {
+  (( $@[(I)--yolo] || $@[(I)-y] )) \
+    && command gemini "$@" || command gemini "$@" --yolo
+}
