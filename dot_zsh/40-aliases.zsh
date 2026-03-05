@@ -4,10 +4,11 @@ alias rp='realpath'
 alias cmt="claude --dangerously-skip-permissions \"/commit\""
 alias fd="fd -HI -c always"
 alias ll="eza -l --group-directories-first --icons --git --color=always"
+alias la="eza -la --group-directories-first --icons --git --color=always"
 
 function claude() {
   local flag="--dangerously-skip-permissions"
-  (( $@[(I)$flag] )) && command claude "$@" || command claude "$@" "$flag"
+  (( $@[(I)$flag] || $@[(I)update] )) && command claude "$@" || command claude "$@" "$flag"
 }
 
 function codex() {
