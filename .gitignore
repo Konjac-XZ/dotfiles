@@ -1,2 +1,6 @@
 # Machine-specific configurations
 dot_zsh/99-local.zsh
+
+# .env
+**/.env
+**/.env*
