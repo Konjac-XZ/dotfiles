@@ -27,3 +27,6 @@ export ENABLE_TOOL_SEARCH=true
 
 # Network and proxy settings
 [ -f "$HOME/.config/proxy.env" ] && . "$HOME/.config/proxy.env"
+
+# Direnv 
+export DIRENV_LOG_FORMAT=""
