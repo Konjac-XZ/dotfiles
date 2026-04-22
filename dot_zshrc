@@ -5,5 +5,3 @@
 for config_file in ~/.zsh/*.zsh(N); do
   source "$config_file"
 done
-
-
