@@ -41,30 +41,9 @@ load_third_party_plugin "fzf-tab"
 
 source "$ZSH/oh-my-zsh.sh"
 
-# Keep Oh-My-Zsh terminal integration, but skip it once the terminal is no longer usable.
-if (( $+functions[omz_termsupport_precmd] )); then
-  functions -c omz_termsupport_precmd _orig_omz_termsupport_precmd
-  function omz_termsupport_precmd() {
-    [[ -t 1 && -t 2 ]] || return 0
-    _orig_omz_termsupport_precmd "$@"
-  }
-fi
-
-if (( $+functions[omz_termsupport_preexec] )); then
-  functions -c omz_termsupport_preexec _orig_omz_termsupport_preexec
-  function omz_termsupport_preexec() {
-    [[ -t 1 && -t 2 ]] || return 0
-    _orig_omz_termsupport_preexec "$@"
-  }
-fi
-
-if (( $+functions[omz_termsupport_cwd] )); then
-  functions -c omz_termsupport_cwd _orig_omz_termsupport_cwd
-  function omz_termsupport_cwd() {
-    [[ -t 1 && -t 2 ]] || return 0
-    _orig_omz_termsupport_cwd "$@"
-  }
-fi
+# Disable Oh-My-Zsh OSC 7 cwd reporting; title hooks stay enabled.
+autoload -Uz add-zsh-hook
+add-zsh-hook -d precmd omz_termsupport_cwd 2>/dev/null || true
 
 # Initialize Starship prompt when available; otherwise rely on the selected Oh-My-Zsh theme.
 have_command starship && eval "$(starship init zsh)"
