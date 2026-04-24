@@ -8,7 +8,9 @@ export TERM="xterm-256color"
 export ZSH="$HOME/.oh-my-zsh"
 [[ -r "$ZSH/oh-my-zsh.sh" ]] || return 0
 
-if [[ -r "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || [[ -r "$ZSH/themes/powerlevel10k.zsh-theme" ]]; then
+if have_command starship; then
+  ZSH_THEME=""
+elif [[ -r "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || [[ -r "$ZSH/themes/powerlevel10k.zsh-theme" ]]; then
   ZSH_THEME="powerlevel10k/powerlevel10k"
 else
   ZSH_THEME=""
@@ -39,5 +41,30 @@ load_third_party_plugin "fzf-tab"
 
 source "$ZSH/oh-my-zsh.sh"
 
-# Load Powerlevel10k configuration
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+# Keep Oh-My-Zsh terminal integration, but skip it once the terminal is no longer usable.
+if (( $+functions[omz_termsupport_precmd] )); then
+  functions -c omz_termsupport_precmd _orig_omz_termsupport_precmd
+  function omz_termsupport_precmd() {
+    [[ -t 1 && -t 2 ]] || return 0
+    _orig_omz_termsupport_precmd "$@"
+  }
+fi
+
+if (( $+functions[omz_termsupport_preexec] )); then
+  functions -c omz_termsupport_preexec _orig_omz_termsupport_preexec
+  function omz_termsupport_preexec() {
+    [[ -t 1 && -t 2 ]] || return 0
+    _orig_omz_termsupport_preexec "$@"
+  }
+fi
+
+if (( $+functions[omz_termsupport_cwd] )); then
+  functions -c omz_termsupport_cwd _orig_omz_termsupport_cwd
+  function omz_termsupport_cwd() {
+    [[ -t 1 && -t 2 ]] || return 0
+    _orig_omz_termsupport_cwd "$@"
+  }
+fi
+
+# Initialize Starship prompt when available; otherwise rely on the selected Oh-My-Zsh theme.
+have_command starship && eval "$(starship init zsh)"

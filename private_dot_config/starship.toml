@@ -1,0 +1,87 @@
+"$schema" = "https://starship.rs/config-schema.json"
+
+format = """$directory$git_branch$git_status$line_break$character"""
+right_format = """$status$cmd_duration$jobs$direnv$time"""
+
+add_newline = true
+command_timeout = 1000
+
+[directory]
+style = "bold #0087af"
+format = "[$path]($style)"
+truncation_length = 3
+truncate_to_repo = false
+read_only = ""
+read_only_style = ""
+
+[git_branch]
+symbol = ""
+style = "fg:76"
+format = " [$branch]($style)"
+
+[git_status]
+style = "fg:178"
+format = "[$all_status$ahead_behind]($style)"
+ahead = " >${count}"
+behind = " <${count}"
+diverged = " <${behind_count}>${ahead_count}"
+up_to_date = ""
+untracked = " ?${count}"
+stashed = " *${count}"
+modified = " !${count}"
+staged = " +${count}"
+renamed = " »${count}"
+deleted = " x${count}"
+conflicted = " ~${count}"
+
+[status]
+disabled = false
+format = "[$status]($style) "
+style = "bold red"
+success_style = "green"
+symbol = ""
+not_executable_symbol = ""
+not_found_symbol = ""
+sigint_symbol = ""
+signal_symbol = ""
+recognize_signal_code = true
+map_symbol = false
+
+[cmd_duration]
+min_time = 3000
+show_milliseconds = false
+format = "[${duration}]($style) "
+style = "fg:101"
+
+[jobs]
+symbol = ""
+number_threshold = 1
+format = "[$number]($style) "
+style = "fg:70"
+
+[direnv]
+disabled = false
+format = "[$loaded/$allowed]($style) "
+style = "dimmed fg:244"
+loaded_msg = "direnv"
+unloaded_msg = ""
+allowed_msg = ""
+not_allowed_msg = "blocked"
+denied_msg = "denied"
+
+[time]
+disabled = false
+time_format = "%H:%M:%S"
+format = "[$time]($style)"
+style = "fg:66"
+
+[line_break]
+disabled = false
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
+vimcmd_symbol = "[<](bold green)"
+vimcmd_replace_one_symbol = "[^](bold #b4befe)"
+vimcmd_replace_symbol = "[^](bold #b4befe)"
+vimcmd_visual_symbol = "[V](bold yellow)"
