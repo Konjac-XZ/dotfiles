@@ -19,15 +19,12 @@ export AFL_DEBUG=1
 export AFL_SKIP_CRASHES=1
 export AFL_FAST_CAL=1
 
-# API base URLs
-export OPENAI_BASE_URL="http://192.168.31.236:3001/v1"
-
 # Tool-specific settings
 export PROTOCOL_GUARD_SQLITE_DATABASE=/root/ProtocolGuard-Database/sqlite_uFTPD.db
 export ENABLE_TOOL_SEARCH=true
 
 # Network and proxy settings
-[ -f "$HOME/.config/proxy.env" ] && . "$HOME/.config/proxy.env"
+[ -f "$HOME/.config/proxy.envrc" ] && source "$HOME/.config/proxy.envrc"
 
 # Direnv 
 export DIRENV_LOG_FORMAT=""
