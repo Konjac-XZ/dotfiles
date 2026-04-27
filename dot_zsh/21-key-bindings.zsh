@@ -20,5 +20,6 @@ typeset -ga ctrl_backspace_sequences=(
 )
 
 for sequence in $ctrl_backspace_sequences; do
-    bindkey "$sequence" backward-kill-word
+    bindkey -M emacs "$sequence" backward-kill-word
+    bindkey -M viins "$sequence" backward-kill-word
 done
