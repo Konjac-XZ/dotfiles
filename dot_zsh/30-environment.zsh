@@ -24,7 +24,15 @@ export PROTOCOL_GUARD_SQLITE_DATABASE=/root/ProtocolGuard-Database/sqlite_uFTPD.
 export ENABLE_TOOL_SEARCH=true
 
 # Network and proxy settings
-[ -f "$HOME/.config/proxy.envrc" ] && source "$HOME/.config/proxy.envrc"
+if [ -f "$HOME/.config/proxy.envrc" ]; then
+	source "$HOME/.config/proxy.envrc"
+elif [ -f "$HOME/.config/proxy.env" ]; then
+	# Export plain KEY=VALUE entries from a standard .env file.
+	set -a
+	source "$HOME/.config/proxy.env"
+	set +a
+fi
+
 
 # Direnv 
 export DIRENV_LOG_FORMAT=""
