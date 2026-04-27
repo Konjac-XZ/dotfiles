@@ -1,10 +1,13 @@
 "$schema" = "https://starship.rs/config-schema.json"
 
-format = """$directory$git_branch$git_status$line_break$character"""
-right_format = """$status$cmd_duration$jobs$direnv$username$hostname$time"""
+format = """$directory$git_branch$git_status$fill$username$hostname$time$line_break$character"""
+right_format = """$status$cmd_duration$jobs$direnv"""
 
 add_newline = true
 command_timeout = 1000
+
+[fill]
+symbol = " "
 
 [directory]
 style = "bold #0087af"
