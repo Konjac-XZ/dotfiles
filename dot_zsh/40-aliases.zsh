@@ -1,7 +1,11 @@
 # Aliases
 
 alias rp='realpath'
-alias cmt="claude --dangerously-skip-permissions \"/commit\""
+if (( $+commands[opencode] )); then
+  alias cmt='opencode run "commit with your skill"'
+else
+  alias cmt="claude --dangerously-skip-permissions \"/commit\""
+fi
 alias fd="fd -HI -c always"
 alias ll="eza -l --group-directories-first --icons --git --color=always"
 alias la="eza -la --group-directories-first --icons --git --color=always"
