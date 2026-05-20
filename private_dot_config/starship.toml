@@ -12,7 +12,8 @@ symbol = " "
 [directory]
 style = "bold #0087af"
 format = "[$path]($style)"
-truncation_length = 3
+truncation_length = 8
+truncation_symbol = "…/"
 truncate_to_repo = false
 read_only = ""
 read_only_style = ""
