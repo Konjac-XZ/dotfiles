@@ -6,6 +6,7 @@ export XDG_CONFIG_HOME="$HOME/.config"
 add_to_path "$HOME/go/bin"
 add_to_path "$HOME/.local/bin"
 add_to_path "$HOME/.opencode/bin"
+prefer_path_order "$HOME/.local/bin" /usr/local/bin /usr/bin
 
 export IS_SANDBOX=1
 

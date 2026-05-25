@@ -10,6 +10,50 @@ function add_to_path() {
     fi
 }
 
+# Reorder selected PATH entries within their existing slots.
+function prefer_path_order() {
+    local -a selected_path preferred_path reordered_path
+    local candidate entry
+
+    for candidate in "$@"; do
+        [[ -d "$candidate" ]] && selected_path+=("$candidate")
+    done
+
+    (( ${#selected_path} )) || return 0
+
+    for candidate in "${selected_path[@]}"; do
+        for entry in "${path[@]}"; do
+            if [[ "$entry" == "$candidate" ]]; then
+                preferred_path+=("$candidate")
+                break
+            fi
+        done
+    done
+
+    (( ${#preferred_path} )) || return 0
+
+    for entry in "${path[@]}"; do
+        local replace=0
+
+        for candidate in "${selected_path[@]}"; do
+            if [[ "$entry" == "$candidate" ]]; then
+                replace=1
+                break
+            fi
+        done
+
+        if (( replace && ${#preferred_path} )); then
+            reordered_path+=("${preferred_path[1]}")
+            preferred_path=("${preferred_path[@]:1}")
+        else
+            reordered_path+=("$entry")
+        fi
+    done
+
+    path=("${reordered_path[@]}")
+    export PATH
+}
+
 # Check whether a command is currently available on PATH.
 function have_command() {
     (( $+commands[$1] ))
