@@ -1,9 +1,37 @@
 # Custom shell functions
 
-function tmuxfix() {
-  printf '\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?1015l'
-  stty sane
-  tmux source-file ~/.tmux.conf >/dev/null 2>&1 || true
+tmuxfix () {
+    if [ -t 1 ]; then
+        printf '\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?1015l'
+        printf '\e[?1004l\e[?2004l\e[0m\e[?25h'
+    fi
+
+    if [ -t 0 ]; then
+        stty sane
+    fi
+
+    if typeset -f _zsh_tmux_plugin_run >/dev/null 2>&1; then
+        _zsh_tmux_plugin_run source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+    elif [ -n "$TMUX" ] && command -v tmux >/dev/null 2>&1; then
+        tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+    fi
+
+    if [ -n "$TMUX" ] && command -v tmux >/dev/null 2>&1; then
+        tmux refresh-client >/dev/null 2>&1 || true
+    fi
+}
+
+tmuxfix-hard () {
+    tmuxfix
+
+    if [ -t 0 ] && [ -t 1 ]; then
+        reset
+    fi
+
+    if [ -n "$TMUX" ] && command -v tmux >/dev/null 2>&1; then
+        tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+        tmux refresh-client >/dev/null 2>&1 || true
+    fi
 }
 
 function code() {
