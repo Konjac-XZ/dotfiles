@@ -1,7 +1,14 @@
 # ~/.zshrc - Main entry point for Zsh configuration
-# Modular configuration files are sourced from ~/.zsh/
+# Modular shared configuration files are sourced from ~/.zsh/.
+# Machine-local hooks are sourced from ~/.local/share/zsh/local.d/.
 
-# Source all configuration files in order
+# Source shared configuration files in order.
 for config_file in ~/.zsh/*.zsh(N); do
+  source "$config_file"
+done
+
+# Source machine-local hooks in order. Files in this directory are intentionally
+# outside chezmoi's shared ~/.zsh tree.
+for config_file in "${ZSH_LOCAL_DIR:-$HOME/.local/share/zsh/local.d}"/*.zsh(N); do
   source "$config_file"
 done
