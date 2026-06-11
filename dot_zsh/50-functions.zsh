@@ -35,11 +35,26 @@ tmuxfix-hard () {
 }
 
 function code() {
-  local vscode_ipc=$(tmux show-env VSCODE_IPC_HOOK_CLI | cut -d '=' -f2) 2>/dev/null
-  if [[ -v TMUX && vscode_ipc != "" ]]; then
-    VSCODE_IPC_HOOK_CLI=$vscode_ipc command code "$@"
-  else
+  local vscode_ipc
+  local vscode_remote_cli
+  local vscode_windows_cli="/mnt/c/Users/Konjac-XZ/AppData/Local/Programs/Microsoft VS Code/bin/code"
+
+  vscode_ipc=$(tmux show-env VSCODE_IPC_HOOK_CLI 2>/dev/null | cut -d '=' -f2)
+  vscode_remote_cli=$(
+    find "$HOME/.vscode-server/bin" -path '*/bin/remote-cli/code' -type f -printf '%T@ %p\n' 2>/dev/null \
+      | sort -nr \
+      | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print }'
+  )
+
+  if [[ -v TMUX && -n "$vscode_ipc" && -x "$vscode_remote_cli" ]]; then
+    VSCODE_IPC_HOOK_CLI=$vscode_ipc "$vscode_remote_cli" "$@"
+  elif [[ -x "$vscode_windows_cli" ]]; then
+    "$vscode_windows_cli" "$@"
+  elif command -v code >/dev/null 2>&1; then
     command code "$@"
+  else
+    print -u2 "code: VS Code launcher not found"
+    return 127
   fi
 }
 
