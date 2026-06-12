@@ -1,0 +1,10 @@
+[Unit]
+Description=Every 5 minutes Codex update check
+
+[Timer]
+OnStartupSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

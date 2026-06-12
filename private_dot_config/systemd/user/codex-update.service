@@ -1,0 +1,10 @@
+[Unit]
+Description=Codex auto-update check
+
+[Service]
+Type=oneshot
+Environment=HOME=%h
+EnvironmentFile=-%h/.config/ai-updaters/env
+ExecStart=%h/.local/share/ai-updaters/bin/upgrade-codex
+TimeoutStartSec=300
+Restart=no

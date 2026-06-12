@@ -1,0 +1,10 @@
+[Unit]
+Description=OpenCode auto-update check
+
+[Service]
+Type=oneshot
+Environment=HOME=%h
+EnvironmentFile=-%h/.config/ai-updaters/env
+ExecStart=%h/.local/share/ai-updaters/bin/upgrade-opencode
+TimeoutStartSec=300
+Restart=no
