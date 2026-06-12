@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+#
+# claude-code-update.sh - Check for Claude Code updates and apply them.
+# Intended to run from claude-code-update.service.
+
+set -euo pipefail
+
+: "${HOME:?HOME is required}"
+
+XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
+XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+PATH="$XDG_BIN_HOME:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+export PATH
+
+CLAUDE_BIN="${CLAUDE_BIN:-$XDG_BIN_HOME/claude}"
+LOG_FILE="${CLAUDE_LOG_FILE:-${LOG_FILE:-$XDG_DATA_HOME/claude/update.log}}"
+GITHUB_API="${CLAUDE_GITHUB_API:-https://api.github.com/repos/anthropics/claude-code/releases/latest}"
+
+prepare_log_file() {
+    local fallback_log="$XDG_DATA_HOME/ai-updaters/claude-code-update.log"
+    local log_dir
+
+    log_dir="$(dirname "$LOG_FILE")"
+    if mkdir -p "$log_dir" 2>/dev/null && { [[ ! -e "$LOG_FILE" ]] || [[ -w "$LOG_FILE" ]]; } && [[ -w "$log_dir" ]]; then
+        return
+    fi
+
+    LOG_FILE="$fallback_log"
+    mkdir -p "$(dirname "$LOG_FILE")"
+}
+
+log() {
+    local msg
+    msg="$(date '+%Y-%m-%d %H:%M:%S') $1"
+    echo "$msg" >> "$LOG_FILE"
+    echo "$msg"
+}
+
+version_gt() {
+    local v1="$1" v2="$2"
+    local core1="${v1%%-*}" core2="${v2%%-*}"
+    local pre1="" pre2=""
+
+    [[ "$v1" == *-* ]] && pre1="${v1#*-}"
+    [[ "$v2" == *-* ]] && pre2="${v2#*-}"
+
+    local IFS=.
+    local i a=($core1) b=($core2)
+
+    for ((i = 0; i < ${#a[@]} || i < ${#b[@]}; i++)); do
+        local av=${a[i]:-0}
+        local bv=${b[i]:-0}
+        if ((av > bv)); then return 0; fi
+        if ((av < bv)); then return 1; fi
+    done
+
+    if [[ -z "$pre1" && -n "$pre2" ]]; then return 0; fi
+    if [[ -n "$pre1" && -z "$pre2" ]]; then return 1; fi
+    if [[ -z "$pre1" && -z "$pre2" ]]; then return 1; fi
+
+    [[ "$pre1" > "$pre2" ]]
+}
+
+get_claude_version() {
+    "$CLAUDE_BIN" --version 2>/dev/null | awk '{print $1}'
+}
+
+prepare_log_file
+
+if [[ ! -x "$CLAUDE_BIN" ]]; then
+    log "[ERROR] Claude Code binary is missing or not executable: $CLAUDE_BIN"
+    exit 1
+fi
+
+for command_name in curl jq awk; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+        log "[ERROR] Required command not found on PATH: $command_name"
+        exit 1
+    fi
+done
+
+current_version="$(get_claude_version)"
+if [[ ! "$current_version" =~ ^[0-9]+([.][0-9]+){2}([-+][0-9A-Za-z.-]+)?$ ]]; then
+    log "[ERROR] Could not parse current Claude Code version from '$CLAUDE_BIN --version'"
+    exit 1
+fi
+
+http_response="$(
+    curl -sfL --max-time 30 \
+        -H "Accept: application/vnd.github+json" \
+        -w "\n%{http_code}" \
+        "$GITHUB_API" 2>/dev/null
+)" || exit 0
+
+http_code="$(echo "$http_response" | tail -1)"
+json_body="$(echo "$http_response" | sed '$d')"
+
+if [[ "$http_code" != "200" ]]; then
+    exit 0
+fi
+
+latest_version="$(echo "$json_body" | jq -r '.tag_name // empty' | sed 's/^v//')"
+if [[ ! "$latest_version" =~ ^[0-9]+([.][0-9]+){2}([-+][0-9A-Za-z.-]+)?$ ]]; then
+    log "[ERROR] Could not parse latest Claude Code version from GitHub API response"
+    exit 1
+fi
+
+if [[ "$latest_version" == "$current_version" ]]; then
+    log "[OK] Claude Code $current_version is up to date"
+    exit 0
+fi
+
+if ! version_gt "$latest_version" "$current_version"; then
+    log "[OK] Current $current_version >= latest $latest_version, nothing to do"
+    exit 0
+fi
+
+log "[UPDATE] Updating Claude Code: $current_version -> $latest_version"
+
+if ! update_output="$("$CLAUDE_BIN" update 2>&1)"; then
+    log "[ERROR] Update failed: $update_output"
+    exit 1
+fi
+
+new_version="$(get_claude_version)"
+if [[ -z "$new_version" ]]; then
+    log "[ERROR] Update completed but new Claude Code version could not be read"
+    exit 1
+fi
+
+if [[ "$new_version" == "$current_version" && "$latest_version" != "$current_version" ]]; then
+    log "[ERROR] Update completed but version stayed at $current_version"
+    exit 1
+fi
+
+log "[SUCCESS] Claude Code updated: $current_version -> $new_version"

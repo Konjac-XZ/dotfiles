@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+#
+# upgrade-opencode - Check for OpenCode updates and apply them.
+# Intended to run from opencode-update.service.
+
+set -euo pipefail
+
+: "${HOME:?HOME is required}"
+
+XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
+XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+PATH="$HOME/.opencode/bin:$XDG_BIN_HOME:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+export PATH
+
+OPENCODE_BIN="${OPENCODE_BIN:-$HOME/.opencode/bin/opencode}"
+LOG_FILE="${OPENCODE_LOG_FILE:-${LOG_FILE:-$XDG_DATA_HOME/opencode/update.log}}"
+UPGRADE_METHOD="${OPENCODE_UPGRADE_METHOD:-curl}"
+GITHUB_API="${OPENCODE_GITHUB_API:-https://api.github.com/repos/anomalyco/opencode/releases/latest}"
+
+prepare_log_file() {
+    local fallback_log="$XDG_DATA_HOME/ai-updaters/opencode-update.log"
+    local log_dir
+
+    log_dir="$(dirname "$LOG_FILE")"
+    if mkdir -p "$log_dir" 2>/dev/null && { [[ ! -e "$LOG_FILE" ]] || [[ -w "$LOG_FILE" ]]; } && [[ -w "$log_dir" ]]; then
+        return
+    fi
+
+    LOG_FILE="$fallback_log"
+    mkdir -p "$(dirname "$LOG_FILE")"
+}
+
+log() {
+    local msg
+    msg="$(date '+%Y-%m-%d %H:%M:%S') $1"
+    echo "$msg" >> "$LOG_FILE"
+    echo "$msg"
+}
+
+get_opencode_version() {
+    "$OPENCODE_BIN" --version 2>/dev/null | awk 'NR == 1 {print $1}'
+}
+
+prepare_log_file
+
+if [[ ! -x "$OPENCODE_BIN" ]]; then
+    log "[ERROR] OpenCode binary is missing or not executable: $OPENCODE_BIN"
+    exit 1
+fi
+
+current_version="$(get_opencode_version)"
+if [[ ! "$current_version" =~ ^v?[0-9]+([.][0-9]+){2}([-+][0-9A-Za-z.-]+)?$ ]]; then
+    log "[ERROR] Could not parse current OpenCode version from '$OPENCODE_BIN --version'"
+    exit 1
+fi
+current_version="${current_version#v}"
+
+if ! command -v curl >/dev/null 2>&1; then
+    log "[ERROR] Required command not found on PATH: curl"
+    exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+    log "[ERROR] Required command not found on PATH: jq"
+    exit 1
+fi
+
+http_response="$(
+    curl -sfL --max-time 30 \
+        -H "Accept: application/vnd.github+json" \
+        -w "\n%{http_code}" \
+        "$GITHUB_API" 2>/dev/null
+)" || exit 0
+
+http_code="$(echo "$http_response" | tail -1)"
+json_body="$(echo "$http_response" | sed '$d')"
+
+if [[ "$http_code" != "200" ]]; then
+    exit 0
+fi
+
+latest_version="$(echo "$json_body" | jq -r '.tag_name // empty' | sed 's/^v//')"
+if [[ ! "$latest_version" =~ ^[0-9]+([.][0-9]+){2}([-+][0-9A-Za-z.-]+)?$ ]]; then
+    log "[ERROR] Could not parse latest OpenCode version from GitHub API response"
+    exit 1
+fi
+
+if [[ "$latest_version" == "$current_version" ]]; then
+    log "[OK] OpenCode $current_version is up to date"
+    exit 0
+fi
+
+log "[UPDATE] Updating OpenCode: $current_version -> $latest_version"
+
+if ! upgrade_output="$("$OPENCODE_BIN" upgrade --method "$UPGRADE_METHOD" --print-logs --log-level INFO 2>&1)"; then
+    log "[ERROR] OpenCode upgrade failed: $upgrade_output"
+    exit 1
+fi
+
+new_version="$(get_opencode_version)"
+if [[ ! "$new_version" =~ ^v?[0-9]+([.][0-9]+){2}([-+][0-9A-Za-z.-]+)?$ ]]; then
+    log "[ERROR] OpenCode upgrade completed but the new version could not be read"
+    exit 1
+fi
+new_version="${new_version#v}"
+
+if [[ "$new_version" == "$current_version" ]]; then
+    log "[ERROR] OpenCode upgrade completed but version stayed at $current_version"
+    exit 1
+else
+    log "[SUCCESS] OpenCode updated: $current_version -> $new_version"
+fi
