@@ -17,9 +17,33 @@ if ! systemctl --user show-environment >/dev/null 2>&1; then
   exit 0
 fi
 
+TIMERS="
+claude-code-update.timer
+codex-update.timer
+opencode-update.timer
+"
+
+NEEDS_ENABLE=0
+for timer in $TIMERS; do
+  if ! systemctl --user cat "$timer" >/dev/null 2>&1; then
+    echo "[chezmoi] ERROR: user systemd timer unit is missing: $timer" >&2
+    NEEDS_ENABLE=1
+    continue
+  fi
+
+  if systemctl --user is-enabled --quiet "$timer" && systemctl --user is-active --quiet "$timer"; then
+    echo "[chezmoi] OK: AI updater timer already enabled and active: $timer"
+  else
+    echo "[chezmoi] ENABLE: AI updater timer: $timer"
+    NEEDS_ENABLE=1
+  fi
+done
+
+if [ "$NEEDS_ENABLE" -eq 0 ]; then
+  echo "[chezmoi] OK: AI updater timers are already registered."
+  exit 0
+fi
+
 systemctl --user daemon-reload
-systemctl --user enable --now \
-  claude-code-update.timer \
-  codex-update.timer \
-  opencode-update.timer
+systemctl --user enable --now $TIMERS
 {{- end -}}
