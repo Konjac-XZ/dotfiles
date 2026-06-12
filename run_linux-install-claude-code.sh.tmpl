@@ -1,0 +1,49 @@
+{{- if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bash
+set -u
+
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+  echo "[chezmoi] INFO: Root user detected. Skipping Claude Code installation."
+  exit 0
+fi
+
+XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
+PATH="$XDG_BIN_HOME:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+export PATH
+
+CLAUDE_BIN="${CLAUDE_BIN:-$XDG_BIN_HOME/claude}"
+
+if [ -x "$CLAUDE_BIN" ]; then
+  echo "[chezmoi] OK: Claude Code already installed: $($CLAUDE_BIN --version 2>/dev/null || printf '%s' "$CLAUDE_BIN")"
+  exit 0
+fi
+
+if command -v claude >/dev/null 2>&1; then
+  echo "[chezmoi] OK: Claude Code already installed: $(claude --version 2>/dev/null || command -v claude)"
+  exit 0
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "[chezmoi] ERROR: curl is required to install Claude Code, but it was not found on PATH." >&2
+  exit 1
+fi
+
+echo "[chezmoi] INSTALL: Claude Code via native installer"
+if curl -fsSL https://claude.ai/install.sh | bash; then
+  PATH="$XDG_BIN_HOME:$PATH"
+  if [ -x "$CLAUDE_BIN" ]; then
+    echo "[chezmoi] OK: installed Claude Code: $($CLAUDE_BIN --version 2>/dev/null || printf '%s' "$CLAUDE_BIN")"
+    exit 0
+  fi
+  if command -v claude >/dev/null 2>&1; then
+    echo "[chezmoi] OK: installed Claude Code: $(claude --version 2>/dev/null || command -v claude)"
+    exit 0
+  fi
+
+  echo "[chezmoi] ERROR: Claude Code installer completed, but claude was not found on PATH." >&2
+  exit 1
+else
+  echo "[chezmoi] ERROR: Claude Code installation failed." >&2
+  exit 1
+fi
+{{- end -}}
