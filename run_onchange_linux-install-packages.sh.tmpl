@@ -43,12 +43,53 @@ if ! brew help bundle >/dev/null 2>&1; then
 fi
 
 # ---- Install declared packages ----
-brew bundle --no-upgrade --file=/dev/stdin >/dev/null 2>&1 <<'EOF'
+FAILED=0
+
+install_brew() {
+  local package="$1"
+
+  if brew list --formula "$package" >/dev/null 2>&1; then
+    echo "[chezmoi] OK: brew package already installed: $package"
+    return 0
+  fi
+
+  echo "[chezmoi] INSTALL: brew package: $package"
+  if brew install "$package"; then
+    echo "[chezmoi] OK: installed brew package: $package"
+  else
+    echo "[chezmoi] ERROR: failed to install brew package: $package" >&2
+    return 1
+  fi
+}
+
+install_cask() {
+  local package="$1"
+
+  if brew list --cask "$package" >/dev/null 2>&1; then
+    echo "[chezmoi] OK: cask already installed: $package"
+    return 0
+  fi
+
+  echo "[chezmoi] INSTALL: cask: $package"
+  if brew install --cask "$package"; then
+    echo "[chezmoi] OK: installed cask: $package"
+  else
+    echo "[chezmoi] ERROR: failed to install cask: $package" >&2
+    return 1
+  fi
+}
+
 {{- range .packages.linux.brews }}
-brew {{ . | quote }}
+install_brew {{ . | quote }} || FAILED=1
 {{- end }}
 {{- range .packages.linux.casks }}
-cask {{ . | quote }}
+install_cask {{ . | quote }} || FAILED=1
 {{- end }}
-EOF
+
+if [ "$FAILED" -ne 0 ]; then
+  echo "[chezmoi] ERROR: one or more Homebrew packages failed to install." >&2
+  exit 1
+fi
+
+echo "[chezmoi] OK: Homebrew package installation check completed."
 {{- end -}}
