@@ -8,6 +8,7 @@ packages:
       - "fzf"
       - "ripgrep"
       - "zoxide"
+      - "curl"
       - "aria2"
       - "jq"
       - "btop"
