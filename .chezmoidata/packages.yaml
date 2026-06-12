@@ -9,6 +9,7 @@ packages:
       - "ripgrep"
       - "zoxide"
       - "aria2"
+      - "jq"
       - "btop"
       - "tmux"
       - "yazi"

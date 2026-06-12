@@ -1,0 +1,25 @@
+{{- if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bash
+set -eu
+
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+  echo "[chezmoi] INFO: Root user detected. Skipping user systemd AI updater timers."
+  exit 0
+fi
+
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "[chezmoi] INFO: systemctl not found. Skipping AI updater timers."
+  exit 0
+fi
+
+if ! systemctl --user show-environment >/dev/null 2>&1; then
+  echo "[chezmoi] INFO: systemd user manager is not available. Skipping AI updater timers."
+  exit 0
+fi
+
+systemctl --user daemon-reload
+systemctl --user enable --now \
+  claude-code-update.timer \
+  codex-update.timer \
+  opencode-update.timer
+{{- end -}}

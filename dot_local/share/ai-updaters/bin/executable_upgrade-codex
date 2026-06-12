@@ -166,7 +166,7 @@ fi
 
 # Collect all non-draft release versions that carry our asset
 # Output: "TAG VERSION" pairs (preserving full tag name for download URL lookup)
-mapfile -t candidate_pairs < <(echo "$json_body" | /usr/bin/jq -r --arg asset "$ASSET_NAME" '
+mapfile -t candidate_pairs < <(echo "$json_body" | jq -r --arg asset "$ASSET_NAME" '
     .[] | select(.draft == false)
     | select(.assets[] | .name == $asset)
     | [.tag_name, (.tag_name | gsub(".*v"; ""))] | join(" ")')
@@ -193,7 +193,7 @@ if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
     exit 1
 fi
 
-dl_url=$(echo "$json_body" | /usr/bin/jq -r --arg asset "$ASSET_NAME" --arg tag "$latest_tag" '
+dl_url=$(echo "$json_body" | jq -r --arg asset "$ASSET_NAME" --arg tag "$latest_tag" '
     .[] | select(.draft == false) | select(.tag_name == $tag)
     | .assets[] | select(.name == $asset) | .browser_download_url' | head -1)
 
