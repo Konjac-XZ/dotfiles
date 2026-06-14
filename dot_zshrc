@@ -12,3 +12,4 @@ done
 for config_file in "${ZSH_LOCAL_DIR:-$HOME/.local/share/zsh/local.d}"/*.zsh(N); do
   source "$config_file"
 done
+
