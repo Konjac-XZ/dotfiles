@@ -46,41 +46,45 @@ function code() {
     tmux_vscode_ipc=$(tmux show-env VSCODE_IPC_HOOK_CLI 2>/dev/null | cut -d '=' -f2)
     [[ -S "$tmux_vscode_ipc" ]] && vscode_ipc=$tmux_vscode_ipc
   fi
-  if command -v fdfind >/dev/null 2>&1; then
-    vscode_remote_cli=$(
-      fdfind -H -t f --full-path '/bin/remote-cli/code$' "$HOME/.vscode-server" 2>/dev/null \
-        | xargs -r stat -c '%Y %n' \
-        | sort -nr \
-        | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print }'
-    )
-  elif command -v fd >/dev/null 2>&1; then
-    vscode_remote_cli=$(
-      fd -H -t f --full-path '/bin/remote-cli/code$' "$HOME/.vscode-server" 2>/dev/null \
-        | xargs -r stat -c '%Y %n' \
-        | sort -nr \
-        | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print }'
-    )
-  else
-    vscode_remote_cli=$(
-      find "$HOME/.vscode-server" -path '*/bin/remote-cli/code' -type f -printf '%T@ %p\n' 2>/dev/null \
-        | sort -nr \
-        | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print }'
-    )
-  fi
-
-  if [[ -n "$vscode_ipc" && -x "$vscode_remote_cli" ]]; then
-    VSCODE_IPC_HOOK_CLI=$vscode_ipc "$vscode_remote_cli" "$@"
-  elif [[ -x "$vscode_windows_cli" ]]; then
-    "$vscode_windows_cli" "$@"
-  elif command -v code >/dev/null 2>&1; then
+  if (( $+commands[code] )); then
     if [[ -n "$vscode_ipc" ]]; then
       VSCODE_IPC_HOOK_CLI=$vscode_ipc command code "$@"
     else
-      env -u VSCODE_IPC_HOOK_CLI code "$@"
+      env -u VSCODE_IPC_HOOK_CLI command code "$@"
     fi
+  elif [[ -x "$vscode_windows_cli" ]]; then
+    "$vscode_windows_cli" "$@"
   else
-    print -u2 "code: VS Code launcher not found"
-    return 127
+    if command -v fdfind >/dev/null 2>&1; then
+      vscode_remote_cli=$(
+        fdfind -H -t f --full-path '/bin/remote-cli/code$' "$HOME/.vscode-server" 2>/dev/null \
+          | xargs -r stat -c '%Y %n' \
+          | sort -nr \
+          | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print }'
+      )
+    elif command -v fd >/dev/null 2>&1; then
+      vscode_remote_cli=$(
+        fd -H -t f --full-path '/bin/remote-cli/code$' "$HOME/.vscode-server" 2>/dev/null \
+          | xargs -r stat -c '%Y %n' \
+          | sort -nr \
+          | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print }'
+      )
+    else
+      vscode_remote_cli=$(
+        find "$HOME/.vscode-server" -path '*/bin/remote-cli/code' -type f -printf '%T@ %p\n' 2>/dev/null \
+          | sort -nr \
+          | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print }'
+      )
+    fi
+
+    if [[ -n "$vscode_ipc" && -x "$vscode_remote_cli" ]]; then
+      VSCODE_IPC_HOOK_CLI=$vscode_ipc "$vscode_remote_cli" "$@"
+    elif [[ -x "$vscode_remote_cli" ]]; then
+      env -u VSCODE_IPC_HOOK_CLI "$vscode_remote_cli" "$@"
+    else
+      print -u2 "code: VS Code launcher not found"
+      return 127
+    fi
   fi
 }
 
