@@ -3,7 +3,7 @@
 # Skip Oh-My-Zsh and plugin loading in non-interactive shells.
 [[ "${IS_INTERACTIVE_SHELL:-0}" -eq 1 ]] || return 0
 
-export TERM="xterm-256color"
+[[ -z "$TMUX" && -z "$TERM" ]] && export TERM="xterm-256color"
 
 export ZSH="$HOME/.oh-my-zsh"
 [[ -r "$ZSH/oh-my-zsh.sh" ]] || return 0
