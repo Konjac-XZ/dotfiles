@@ -38,3 +38,6 @@ fi
 
 # Direnv 
 export DIRENV_LOG_FORMAT=""
+
+# Yazi
+export EDITOR="code -r"
