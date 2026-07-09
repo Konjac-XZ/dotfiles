@@ -50,7 +50,7 @@ function code() {
     if [[ -n "$vscode_ipc" ]]; then
       VSCODE_IPC_HOOK_CLI=$vscode_ipc command code "$@"
     else
-      env -u VSCODE_IPC_HOOK_CLI command code "$@"
+      (unset VSCODE_IPC_HOOK_CLI; command code "$@")
     fi
   elif [[ -x "$vscode_windows_cli" ]]; then
     "$vscode_windows_cli" "$@"
