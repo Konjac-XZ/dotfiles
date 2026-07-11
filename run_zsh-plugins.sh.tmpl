@@ -1,0 +1,125 @@
+#!/usr/bin/env sh
+set -eu
+
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+failures=0
+
+log() {
+  printf '[chezmoi] %s\n' "$*"
+}
+
+normalize_repo_url() {
+  url="${1%/}"
+  url="${url%.git}"
+  printf '%s\n' "$url"
+}
+
+ensure_oh_my_zsh() {
+  if [ -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    log "OK: oh-my-zsh already exists: $HOME/.oh-my-zsh"
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    log "ERROR: curl is required to install oh-my-zsh, but it was not found on PATH."
+    return 1
+  fi
+
+  log "INSTALL: oh-my-zsh missing, running official installer"
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" sh --unattended --keep-zshrc
+
+  if [ -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    log "OK: installed oh-my-zsh: $HOME/.oh-my-zsh"
+    return 0
+  fi
+
+  log "ERROR: oh-my-zsh installer completed, but $HOME/.oh-my-zsh/oh-my-zsh.sh is still missing."
+  return 1
+}
+
+ensure_repo() {
+  repo="$1"
+  target="$2"
+  branch="${3:-}"
+  expected_url="$(normalize_repo_url "$repo")"
+
+  if [ -e "$target" ]; then
+    if [ ! -d "$target/.git" ] && [ ! -f "$target/.git" ]; then
+      log "ERROR: path exists but is not a Git repository: $target"
+      return 1
+    fi
+
+    actual_url="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
+    if [ -z "$actual_url" ]; then
+      log "ERROR: repository is missing origin remote: $target"
+      return 1
+    fi
+
+    actual_url="$(normalize_repo_url "$actual_url")"
+    if [ "$actual_url" != "$expected_url" ]; then
+      log "ERROR: repository origin mismatch: $target (expected $repo, found $(git -C "$target" remote get-url origin))"
+      return 1
+    fi
+
+    log "OK: repository already exists: $target"
+    return 0
+  fi
+
+  log "INSTALL: repository missing, cloning $repo -> $target"
+  mkdir -p "$(dirname "$target")"
+
+  if [ -n "$branch" ]; then
+    git clone --quiet --depth 1 --single-branch -b "$branch" "$repo" "$target"
+  else
+    git clone --quiet --depth 1 --single-branch "$repo" "$target"
+  fi
+
+  if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
+    log "OK: cloned repository: $target"
+    return 0
+  fi
+
+  log "ERROR: clone completed, but Git metadata is missing: $target"
+  return 1
+}
+
+ensure_oh_my_zsh || failures=1
+
+if ! command -v git >/dev/null 2>&1; then
+  log "ERROR: git is required to check zsh and tmux plugin repositories, but it was not found on PATH."
+  exit 1
+fi
+
+pids=""
+
+ensure_repo "https://github.com/tmux-plugins/tpm" "$HOME/.tmux/plugins/tpm" &
+pids="$pids $!"
+
+ensure_repo "https://github.com/catppuccin/tmux.git" "$HOME/.config/tmux/plugins/catppuccin/tmux" "v2.3.0" &
+pids="$pids $!"
+
+ensure_repo "https://github.com/romkatv/powerlevel10k.git" "$ZSH_CUSTOM/themes/powerlevel10k" &
+pids="$pids $!"
+
+ensure_repo "https://github.com/zsh-users/zsh-autosuggestions" "$ZSH_CUSTOM/plugins/zsh-autosuggestions" &
+pids="$pids $!"
+
+ensure_repo "https://github.com/zsh-users/zsh-syntax-highlighting.git" "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" &
+pids="$pids $!"
+
+ensure_repo "https://github.com/Aloxaf/fzf-tab" "$ZSH_CUSTOM/plugins/fzf-tab" &
+pids="$pids $!"
+
+ensure_repo "https://github.com/sunlei/zsh-ssh" "$ZSH_CUSTOM/plugins/zsh-ssh" &
+pids="$pids $!"
+
+for pid in $pids; do
+  wait "$pid" || failures=1
+done
+
+if [ "$failures" -ne 0 ]; then
+  log "ERROR: one or more zsh/tmux repository checks failed."
+  exit 1
+fi
+
+log "OK: zsh/tmux repository checks completed."
