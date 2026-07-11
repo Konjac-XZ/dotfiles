@@ -47,12 +47,50 @@ fi
 
 # ---- Install declared packages ----
 FAILED=0
+CHECK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chezmoi-brew-check.XXXXXX")"
+trap 'rm -rf "$CHECK_DIR"' EXIT
 
-install_brew() {
+declare -a CHECK_TYPES=()
+declare -a CHECK_PACKAGES=()
+declare -a CHECK_FILES=()
+declare -a CHECK_PIDS=()
+
+FORMULA_CHECKS=0
+CASK_CHECKS=0
+
+queue_check() {
+  local type="$1"
+  local package="$2"
+  local index="${#CHECK_PACKAGES[@]}"
+  local result_file="$CHECK_DIR/$index.status"
+
+  CHECK_TYPES[$index]="$type"
+  CHECK_PACKAGES[$index]="$package"
+  CHECK_FILES[$index]="$result_file"
+
+  case "$type" in
+    formula)
+      FORMULA_CHECKS=$((FORMULA_CHECKS + 1))
+      (brew list --formula "$package" >/dev/null 2>&1 && printf 'installed\n' >"$result_file" || printf 'missing\n' >"$result_file") &
+      ;;
+    cask)
+      CASK_CHECKS=$((CASK_CHECKS + 1))
+      (brew list --cask "$package" >/dev/null 2>&1 && printf 'installed\n' >"$result_file" || printf 'missing\n' >"$result_file") &
+      ;;
+    *)
+      echo "[chezmoi] ERROR: unsupported Homebrew package type: $type" >&2
+      return 1
+      ;;
+  esac
+
+  CHECK_PIDS[$index]=$!
+}
+
+install_missing_brew() {
   local package="$1"
 
   if brew list --formula "$package" >/dev/null 2>&1; then
-    echo "[chezmoi] OK: brew package already installed: $package"
+    echo "[chezmoi] OK: brew package already installed after dependency install: $package"
     return 0
   fi
 
@@ -65,11 +103,11 @@ install_brew() {
   fi
 }
 
-install_cask() {
+install_missing_cask() {
   local package="$1"
 
   if brew list --cask "$package" >/dev/null 2>&1; then
-    echo "[chezmoi] OK: cask already installed: $package"
+    echo "[chezmoi] OK: cask already installed after dependency install: $package"
     return 0
   fi
 
@@ -83,11 +121,54 @@ install_cask() {
 }
 
 {{- range .packages.linux.brews }}
-install_brew {{ . | quote }} || FAILED=1
+queue_check formula {{ . | quote }} || FAILED=1
 {{- end }}
 {{- range .packages.linux.casks }}
-install_cask {{ . | quote }} || FAILED=1
+queue_check cask {{ . | quote }} || FAILED=1
 {{- end }}
+
+echo "[chezmoi] CHECK: queued Homebrew package checks: $FORMULA_CHECKS formula(s), $CASK_CHECKS cask(s)."
+
+for index in "${!CHECK_PIDS[@]}"; do
+  if ! wait "${CHECK_PIDS[$index]}"; then
+    echo "[chezmoi] ERROR: Homebrew check failed: ${CHECK_TYPES[$index]} ${CHECK_PACKAGES[$index]}" >&2
+    printf 'error\n' >"${CHECK_FILES[$index]}"
+    FAILED=1
+  fi
+done
+
+for index in "${!CHECK_PACKAGES[@]}"; do
+  type="${CHECK_TYPES[$index]}"
+  package="${CHECK_PACKAGES[$index]}"
+  result="$(cat "${CHECK_FILES[$index]}" 2>/dev/null || printf 'error\n')"
+
+  case "$result" in
+    installed)
+      case "$type" in
+        formula)
+          echo "[chezmoi] OK: brew package already installed: $package"
+          ;;
+        cask)
+          echo "[chezmoi] OK: cask already installed: $package"
+          ;;
+      esac
+      ;;
+    missing)
+      case "$type" in
+        formula)
+          install_missing_brew "$package" || FAILED=1
+          ;;
+        cask)
+          install_missing_cask "$package" || FAILED=1
+          ;;
+      esac
+      ;;
+    *)
+      echo "[chezmoi] ERROR: Homebrew check produced an invalid result: $type $package" >&2
+      FAILED=1
+      ;;
+  esac
+done
 
 if [ "$FAILED" -ne 0 ]; then
   echo "[chezmoi] ERROR: one or more Homebrew packages failed to install." >&2
