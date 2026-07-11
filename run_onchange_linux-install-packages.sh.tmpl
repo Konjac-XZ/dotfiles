@@ -37,6 +37,9 @@ if [ -z "$BREW_ENV" ]; then
 fi
 eval "$BREW_ENV"
 
+# Homebrew defaults to ask mode for installs; make chezmoi runs unattended.
+export HOMEBREW_NO_ASK=1
+
 # Ensure brew bundle exists
 if ! brew help bundle >/dev/null 2>&1; then
   brew tap homebrew/bundle >/dev/null 2>&1 || true
