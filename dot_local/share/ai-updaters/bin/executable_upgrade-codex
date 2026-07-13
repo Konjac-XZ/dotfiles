@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 #
-# upgrade-codex - Check for Codex CLI updates and apply them.
-# Intended to run from codex-update.service.
-#
+# upgrade-codex - Select the newest Codex release and delegate its package
+# installation to the official installer shipped with that release.
 
 set -euo pipefail
 
-# Parse arguments
 DRY_RUN=false
 CLEAN_ONLY=false
 KEEP_VERSIONS=3
@@ -26,24 +24,17 @@ XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 PATH="$XDG_BIN_HOME:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 export PATH
 
-detect_codex_target() {
-    case "$(uname -m):$(uname -s)" in
-        x86_64:Linux) echo "x86_64-unknown-linux-musl" ;;
-        aarch64:Linux|arm64:Linux) echo "aarch64-unknown-linux-musl" ;;
-        *)
-            echo "Unsupported Codex platform: $(uname -m) $(uname -s)" >&2
-            return 1
-            ;;
-    esac
-}
-
-INSTALL_DIR="${CODEX_INSTALL_DIR:-$XDG_BIN_HOME}"
-CODEX_LINK="${CODEX_BIN:-$INSTALL_DIR/codex}"
-LOG_FILE="${CODEX_LOG_FILE:-$XDG_DATA_HOME/codex/update.log}"
 GITHUB_API="${CODEX_GITHUB_API:-https://api.github.com/repos/openai/codex/releases}"
-CODEX_TARGET="${CODEX_TARGET:-$(detect_codex_target)}"
-ASSET_NAME="${CODEX_ASSET_NAME:-codex-${CODEX_TARGET}.tar.gz}"
-BINARY_IN_TAR="${CODEX_BINARY_IN_TAR:-codex-${CODEX_TARGET}}"
+LOG_FILE="${CODEX_LOG_FILE:-$XDG_DATA_HOME/codex/update.log}"
+STANDALONE_ROOT="${CODEX_STANDALONE_ROOT:-${CODEX_HOME:-$HOME/.codex}/packages/standalone}"
+RELEASES_DIR="$STANDALONE_ROOT/releases"
+
+case "$(uname -m):$(uname -s)" in
+    x86_64:Linux) CODEX_TARGET="${CODEX_TARGET:-x86_64-unknown-linux-musl}" ;;
+    aarch64:Linux|arm64:Linux) CODEX_TARGET="${CODEX_TARGET:-aarch64-unknown-linux-musl}" ;;
+    *) echo "Unsupported Codex platform: $(uname -m) $(uname -s)" >&2; exit 1 ;;
+esac
+PACKAGE_ASSET="codex-package-$CODEX_TARGET.tar.gz"
 
 prepare_log_file() {
     local fallback_log="$XDG_DATA_HOME/ai-updaters/codex-update.log"
@@ -67,191 +58,135 @@ log() {
 
 cleanup_old_versions() {
     local -a versions=()
-    while IFS= read -r f; do
-        versions+=("$f")
-    done < <(ls -t "$INSTALL_DIR/${BINARY_IN_TAR}"-* 2>/dev/null)
+    local current=""
 
-    local count=${#versions[@]}
-    if (( count <= KEEP_VERSIONS )); then
-        log "[CLEAN] $count version(s) present — nothing to remove (keeping $KEEP_VERSIONS)"
+    [[ -L "$STANDALONE_ROOT/current" ]] && current="$(readlink -f "$STANDALONE_ROOT/current")"
+    while IFS= read -r dir; do
+        versions+=("$dir")
+    done < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d ! -name '.staging.*' \
+        -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2-)
+
+    if (( ${#versions[@]} <= KEEP_VERSIONS )); then
+        log "[CLEAN] ${#versions[@]} release(s) present; keeping $KEEP_VERSIONS"
         return
     fi
 
-    local to_delete=("${versions[@]:$KEEP_VERSIONS}")
-    for f in "${to_delete[@]}"; do
-        local name
-        name="$(basename "$f")"
+    local dir
+    for dir in "${versions[@]:$KEEP_VERSIONS}"; do
+        if [[ "$(readlink -f "$dir")" == "$current" ]]; then
+            continue
+        fi
         if $DRY_RUN; then
-            log "[DRY-RUN] Would delete: $name"
+            log "[DRY-RUN] Would remove release: $(basename "$dir")"
         else
-            log "[CLEAN] Removing old version: $name"
-            rm -f "$f"
+            log "[CLEAN] Removing old release: $(basename "$dir")"
+            rm -rf "$dir"
         fi
     done
 }
 
+version_gt() {
+    local highest
+    highest="$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)"
+    [[ "$highest" == "$1" && "$1" != "$2" ]]
+}
+
 prepare_log_file
-mkdir -p "$INSTALL_DIR"
+mkdir -p "$RELEASES_DIR"
 
 if $CLEAN_ONLY; then
     cleanup_old_versions
     exit 0
 fi
 
-# Get current installed version (via symlink target filename)
-current_version=""
-if [[ -L "$CODEX_LINK" ]]; then
-    target="$(readlink "$CODEX_LINK")"
-    # Extract version from filename: codex-${CODEX_TARGET}-VERSION
-    # The version starts after the last '-' that is followed by a digit.
-    # Use a regex to capture it directly.
-    if [[ "$target" =~ -([0-9][^-]*(-[^0-9][^-]*\.[0-9]+)*)$ ]]; then
-        stripped="${BASH_REMATCH[1]}"
-        stripped="${stripped%%+*}"  # strip build metadata only
-        current_version="$stripped"
-    fi
-    log "[DEBUG] Symlink target: '$target' | Detected current version: '${current_version:-<none>}'"
+current_version="$(codex --version 2>/dev/null | sed -n 's/.* \([0-9][0-9A-Za-z.+-]*\)$/\1/p' | head -1 || true)"
+package_install=false
+if [[ -L "$STANDALONE_ROOT/current" ]] \
+    && [[ -x "$STANDALONE_ROOT/current/bin/codex" ]] \
+    && [[ -x "$STANDALONE_ROOT/current/bin/codex-code-mode-host" ]] \
+    && [[ -x "$STANDALONE_ROOT/current/codex-path/rg" ]]; then
+    package_install=true
 fi
 
-# Semver comparison: returns 0 (true) if $1 > $2
-# Handles pre-release suffixes like 0.105.0-alpha.24
-version_gt() {
-    local v1="$1" v2="$2"
-
-    # Split into core and pre-release parts
-    local core1="${v1%%-*}" pre1="${v1#*-}"
-    local core2="${v2%%-*}" pre2="${v2#*-}"
-    [[ "$v1" != *-* ]] && pre1=""
-    [[ "$v2" != *-* ]] && pre2=""
-
-    # Compare core semver (MAJOR.MINOR.PATCH)
-    local IFS=.
-    local i a=($core1) b=($core2)
-    for ((i = 0; i < ${#a[@]}; i++)); do
-        local av=${a[i]:-0}
-        local bv=${b[i]:-0}
-        if ((av > bv)); then return 0; fi
-        if ((av < bv)); then return 1; fi
-    done
-
-    # Cores are equal — compare pre-release numeric suffix (e.g. alpha.24 vs alpha.26)
-    # A release without a pre-release tag is greater than one with (semver spec)
-    if [[ -z "$pre1" && -n "$pre2" ]]; then return 0; fi
-    if [[ -n "$pre1" && -z "$pre2" ]]; then return 1; fi
-    if [[ -z "$pre1" && -z "$pre2" ]]; then return 1; fi
-
-    # Both have pre-release: extract trailing numeric component and compare
-    local num1="${pre1##*.}" num2="${pre2##*.}"
-    if [[ "$num1" =~ ^[0-9]+$ && "$num2" =~ ^[0-9]+$ ]]; then
-        if ((num1 > num2)); then return 0; fi
-        if ((num1 < num2)); then return 1; fi
-    fi
-    return 1
-}
-
-# Fetch releases list (includes pre-releases)
-http_response=$(curl -sfL --max-time 30 \
-    -H "Accept: application/vnd.github+json" \
-    -w "\n%{http_code}" \
-    "$GITHUB_API?per_page=20" 2>/dev/null) || {
-    exit 0
-}
-
-http_code=$(echo "$http_response" | tail -1)
-json_body=$(echo "$http_response" | sed '$d')
-
-if [[ "$http_code" != "200" ]]; then
-    exit 0
-fi
-
-# Collect all non-draft release versions that carry our asset
-# Output: "TAG VERSION" pairs (preserving full tag name for download URL lookup)
-mapfile -t candidate_pairs < <(echo "$json_body" | jq -r --arg asset "$ASSET_NAME" '
-    .[] | select(.draft == false)
-    | select(.assets[] | .name == $asset)
-    | [.tag_name, (.tag_name | gsub(".*v"; ""))] | join(" ")')
-
-if [[ ${#candidate_pairs[@]} -eq 0 ]]; then
-    log "[ERROR] No suitable releases with asset $ASSET_NAME found"
+if ! json_body="$(curl -fsSL --max-time 30 \
+    -H 'Accept: application/vnd.github+json' \
+    "$GITHUB_API?per_page=20")"; then
+    log "[ERROR] Could not fetch Codex release metadata"
     exit 1
 fi
 
-# Pick the highest version number semantically
-latest_tag="${candidate_pairs[0]%% *}"
-latest_version="${candidate_pairs[0]##* }"
+mapfile -t candidate_pairs < <(jq -r --arg package "$PACKAGE_ASSET" '
+    .[] | select(.draft == false)
+    | select(any(.assets[]; .name == "install.sh"))
+    | select(any(.assets[]; .name == $package))
+    | [.tag_name, (.tag_name | sub("^rust-v"; ""))] | @tsv
+' <<<"$json_body")
+
+if (( ${#candidate_pairs[@]} == 0 )); then
+    log "[ERROR] No installable Codex package releases found"
+    exit 1
+fi
+
+latest_tag="${candidate_pairs[0]%%$'\t'*}"
+latest_version="${candidate_pairs[0]##*$'\t'}"
 for pair in "${candidate_pairs[@]:1}"; do
-    tag="${pair%% *}"
-    v="${pair##* }"
-    if version_gt "$v" "$latest_version"; then
-        latest_version="$v"
-        latest_tag="$tag"
+    version="${pair##*$'\t'}"
+    if version_gt "$version" "$latest_version"; then
+        latest_tag="${pair%%$'\t'*}"
+        latest_version="$version"
     fi
 done
 
-if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
-    log "[ERROR] Could not parse latest version from GitHub API response"
+log "[DEBUG] Latest package version: '$latest_version' | Current installed: '${current_version:-<none>}' | Package layout: '$package_install'"
+if [[ "$latest_version" == "$current_version" ]] && $package_install; then
+    log "[OK] Codex $current_version is up to date"
+    $DRY_RUN && cleanup_old_versions
+    exit 0
+fi
+if [[ -n "$current_version" && "$latest_version" != "$current_version" ]] \
+    && ! version_gt "$latest_version" "$current_version"; then
+    log "[OK] Current $current_version >= latest $latest_version, nothing to do"
+    $DRY_RUN && cleanup_old_versions
+    exit 0
+fi
+
+installer_url="$(jq -r --arg tag "$latest_tag" '
+    .[] | select(.tag_name == $tag) | .assets[]
+    | select(.name == "install.sh") | .browser_download_url
+' <<<"$json_body" | head -1)"
+installer_digest="$(jq -r --arg tag "$latest_tag" '
+    .[] | select(.tag_name == $tag) | .assets[]
+    | select(.name == "install.sh") | .digest
+' <<<"$json_body" | head -1)"
+if [[ -z "$installer_url" || "$installer_url" == "null" \
+    || ! "$installer_digest" =~ ^sha256:[0-9a-fA-F]{64}$ ]]; then
+    log "[ERROR] Official installer not found for $latest_tag"
     exit 1
 fi
 
-dl_url=$(echo "$json_body" | jq -r --arg asset "$ASSET_NAME" --arg tag "$latest_tag" '
-    .[] | select(.draft == false) | select(.tag_name == $tag)
-    | .assets[] | select(.name == $asset) | .browser_download_url' | head -1)
-
-if [[ -z "$dl_url" || "$dl_url" == "null" ]]; then
-    log "[ERROR] Asset $ASSET_NAME not found in latest release $latest_version"
-    exit 1
+if $DRY_RUN; then
+    log "[DRY-RUN] Would update Codex: ${current_version:-none} -> $latest_version"
+    cleanup_old_versions
+    exit 0
 fi
 
-# Version check
-log "[DEBUG] Latest version from GitHub: '$latest_version' | Current installed: '${current_version:-<none>}'"
-if [[ -n "$current_version" ]]; then
-    if [[ "$latest_version" == "$current_version" ]]; then
-        log "[OK] Codex $current_version is up to date"
-        $DRY_RUN && cleanup_old_versions
-        exit 0
-    fi
-    if version_gt "$latest_version" "$current_version"; then
-        log "[DEBUG] '$latest_version' > '$current_version' — upgrade needed"
-    else
-        log "[DEBUG] '$latest_version' <= '$current_version' — no upgrade needed"
-        log "[OK] Current $current_version >= latest $latest_version, nothing to do"
-        $DRY_RUN && cleanup_old_versions
-        exit 0
-    fi
-fi
-
-log "[UPDATE] Updating Codex: ${current_version:-none} -> $latest_version"
-
-# Download and install
-VERSIONED_NAME="${BINARY_IN_TAR}-${latest_version}"
-VERSIONED_PATH="$INSTALL_DIR/$VERSIONED_NAME"
-
-tmpdir=$(mktemp -d)
+log "[UPDATE] Updating Codex package: ${current_version:-none} -> $latest_version"
+tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
+installer="$tmpdir/install.sh"
+curl -fsSL --max-time 60 -o "$installer" "$installer_url"
+echo "${installer_digest#sha256:}  $installer" | sha256sum --check --status
 
-tar_path="$tmpdir/$ASSET_NAME"
+CODEX_INSTALL_DIR="$XDG_BIN_HOME" \
+CODEX_NON_INTERACTIVE=1 \
+CODEX_RELEASE="$latest_version" \
+    sh "$installer"
 
-if command -v aria2c &>/dev/null; then
-    aria2c \
-        --max-connection-per-server=16 --split=16 --min-split-size=1M \
-        --file-allocation=none --console-log-level=warn \
-        --summary-interval=0 --download-result=hide \
-        --allow-overwrite=true --auto-file-renaming=false \
-        --out="$ASSET_NAME" --dir="$tmpdir" \
-        "$dl_url"
-else
-    curl -sfL --max-time 300 -o "$tar_path" "$dl_url"
+installed_version="$(codex --version 2>/dev/null | sed -n 's/.* \([0-9][0-9A-Za-z.+-]*\)$/\1/p' | head -1 || true)"
+if [[ "$installed_version" != "$latest_version" ]]; then
+    log "[ERROR] Installed Codex version '$installed_version' does not match '$latest_version'"
+    exit 1
 fi
 
-# Extract the single binary and rename it
-tar -xzf "$tar_path" -C "$tmpdir" "$BINARY_IN_TAR"
-chmod 0755 "$tmpdir/$BINARY_IN_TAR"
-mv "$tmpdir/$BINARY_IN_TAR" "$VERSIONED_PATH"
-
-# Atomically update the symlink
-ln -sf "$VERSIONED_NAME" "$INSTALL_DIR/.codex.tmp"
-mv -f "$INSTALL_DIR/.codex.tmp" "$CODEX_LINK"
-
-log "[SUCCESS] Codex updated: ${current_version:-none} -> $latest_version ($VERSIONED_NAME)"
-
+log "[SUCCESS] Codex package updated: ${current_version:-none} -> $latest_version"
 cleanup_old_versions
