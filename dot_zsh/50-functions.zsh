@@ -204,7 +204,7 @@ function codex-hard-restart() {
   local control_socket="$HOME/.codex/app-server-control/app-server-control.sock"
   local process_pattern='[c]odex.*app-server|[c]odex-code-mode-host'
   local server_pattern='[c]odex.*app-server.*--listen'
-  local cli_version status
+  local cli_version daemon_status
   local attempt
 
   if [[ -z "$codex_bin" || ! -x "$codex_bin" ]]; then
@@ -233,9 +233,9 @@ function codex-hard-restart() {
   # A GUI client may immediately respawn the daemon. Accept it only when it
   # came from the currently installed Codex release.
   if command pgrep -u "$EUID" -f "$server_pattern" >/dev/null 2>&1; then
-    status=$("$codex_bin" app-server daemon version 2>/dev/null)
-    if [[ "$status" == *\"appServerVersion\":\"${cli_version}\"* ]]; then
-      print -r -- "$status"
+    daemon_status=$("$codex_bin" app-server daemon version 2>/dev/null)
+    if [[ "$daemon_status" == *\"appServerVersion\":\"${cli_version}\"* ]]; then
+      print -r -- "$daemon_status"
       print 'Codex services were respawned successfully.'
       return 0
     fi
@@ -249,10 +249,10 @@ function codex-hard-restart() {
   "$codex_bin" app-server daemon start >/dev/null || return
   command sleep 0.5
 
-  status=$("$codex_bin" app-server daemon version 2>/dev/null)
-  print -r -- "$status"
-  if [[ "$status" != *\"status\":\"running\"* || \
-        "$status" != *\"appServerVersion\":\"${cli_version}\"* ]]; then
+  daemon_status=$("$codex_bin" app-server daemon version 2>/dev/null)
+  print -r -- "$daemon_status"
+  if [[ "$daemon_status" != *\"status\":\"running\"* || \
+        "$daemon_status" != *\"appServerVersion\":\"${cli_version}\"* ]]; then
     print -u2 'codex-hard-restart: daemon did not restart on the current CLI version'
     return 1
   fi
