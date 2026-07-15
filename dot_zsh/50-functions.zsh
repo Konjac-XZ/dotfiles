@@ -196,3 +196,66 @@ function y() {
 	[ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd"
 	rm -f -- "$tmp"
 }
+
+function codex-hard-restart() {
+  emulate -L zsh
+
+  local codex_bin="${commands[codex]}"
+  local control_socket="$HOME/.codex/app-server-control/app-server-control.sock"
+  local process_pattern='[c]odex.*app-server|[c]odex-code-mode-host'
+  local server_pattern='[c]odex.*app-server.*--listen'
+  local cli_version status
+  local attempt
+
+  if [[ -z "$codex_bin" || ! -x "$codex_bin" ]]; then
+    print -u2 'codex-hard-restart: codex executable not found'
+    return 127
+  fi
+
+  cli_version=$("$codex_bin" --version 2>/dev/null)
+  cli_version=${cli_version#codex-cli }
+  print "Restarting Codex app-server, proxy, and code-mode-host (${cli_version})..."
+
+  "$codex_bin" app-server daemon stop >/dev/null 2>&1 || true
+  command pkill -TERM -u "$EUID" -f "$process_pattern" 2>/dev/null || true
+
+  for attempt in {1..20}; do
+    command pgrep -u "$EUID" -f "$process_pattern" >/dev/null 2>&1 || break
+    command sleep 0.1
+  done
+
+  if command pgrep -u "$EUID" -f "$process_pattern" >/dev/null 2>&1; then
+    print 'Processes did not stop after SIGTERM; sending SIGKILL...'
+    command pkill -KILL -u "$EUID" -f "$process_pattern" 2>/dev/null || true
+    command sleep 0.2
+  fi
+
+  # A GUI client may immediately respawn the daemon. Accept it only when it
+  # came from the currently installed Codex release.
+  if command pgrep -u "$EUID" -f "$server_pattern" >/dev/null 2>&1; then
+    status=$("$codex_bin" app-server daemon version 2>/dev/null)
+    if [[ "$status" == *\"appServerVersion\":\"${cli_version}\"* ]]; then
+      print -r -- "$status"
+      print 'Codex services were respawned successfully.'
+      return 0
+    fi
+
+    print -u2 'codex-hard-restart: a stale app-server respawned during cleanup'
+    command pgrep -a -u "$EUID" -f "$process_pattern" >&2
+    return 1
+  fi
+
+  command rm -f -- "$control_socket"
+  "$codex_bin" app-server daemon start >/dev/null || return
+  command sleep 0.5
+
+  status=$("$codex_bin" app-server daemon version 2>/dev/null)
+  print -r -- "$status"
+  if [[ "$status" != *\"status\":\"running\"* || \
+        "$status" != *\"appServerVersion\":\"${cli_version}\"* ]]; then
+    print -u2 'codex-hard-restart: daemon did not restart on the current CLI version'
+    return 1
+  fi
+
+  print 'Codex services restarted successfully.'
+}
