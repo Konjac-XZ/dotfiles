@@ -56,6 +56,21 @@ log() {
     echo "$msg"
 }
 
+release_in_use() {
+    local release_dir="$1"
+    local exe_link exe_path
+
+    release_dir="$(readlink -f "$release_dir")" || return 1
+    for exe_link in /proc/[0-9]*/exe; do
+        exe_path="$(readlink "$exe_link" 2>/dev/null)" || continue
+        if [[ "$exe_path" == "$release_dir/"* ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 cleanup_old_versions() {
     local -a versions=()
     local current=""
@@ -76,10 +91,14 @@ cleanup_old_versions() {
         if [[ "$(readlink -f "$dir")" == "$current" ]]; then
             continue
         fi
+        if release_in_use "$dir"; then
+            log "[CLEAN] Keeping active release: $(basename "$dir")"
+            continue
+        fi
         if $DRY_RUN; then
             log "[DRY-RUN] Would remove release: $(basename "$dir")"
         else
-            log "[CLEAN] Removing old release: $(basename "$dir")"
+            log "[CLEAN] Removing inactive release: $(basename "$dir")"
             rm -rf "$dir"
         fi
     done
