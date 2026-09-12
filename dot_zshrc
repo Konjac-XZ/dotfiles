@@ -13,3 +13,7 @@ for config_file in "${ZSH_LOCAL_DIR:-$HOME/.local/share/zsh/local.d}"/*.zsh(N); 
   source "$config_file"
 done
 
+
+
+# Added by Antigravity CLI installer
+export PATH="/home/xinrui/.local/bin:$PATH"
