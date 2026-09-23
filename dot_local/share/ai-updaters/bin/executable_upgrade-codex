@@ -28,6 +28,7 @@ GITHUB_API="${CODEX_GITHUB_API:-https://api.github.com/repos/openai/codex/releas
 LOG_FILE="${CODEX_LOG_FILE:-$XDG_DATA_HOME/codex/update.log}"
 STANDALONE_ROOT="${CODEX_STANDALONE_ROOT:-${CODEX_HOME:-$HOME/.codex}/packages/standalone}"
 RELEASES_DIR="$STANDALONE_ROOT/releases"
+DAEMON_ROOT="${CODEX_DAEMON_ROOT:-${CODEX_HOME:-$HOME/.codex}/packages/app-server-daemon}"
 
 case "$(uname -m):$(uname -s)" in
     x86_64:Linux) CODEX_TARGET="${CODEX_TARGET:-x86_64-unknown-linux-musl}" ;;
@@ -110,6 +111,41 @@ version_gt() {
     [[ "$highest" == "$1" && "$1" != "$2" ]]
 }
 
+daemon_package_selected() {
+    [[ -L "$DAEMON_ROOT/current" && -x "$DAEMON_ROOT/current/bin/codex" ]]
+}
+
+update_managed_daemon() {
+    if ! daemon_package_selected; then
+        log "[OK] No managed Codex daemon package selected; skipping daemon update"
+        return
+    fi
+
+    log "[UPDATE] Updating the managed Codex daemon package"
+    local output line
+    if output="$(codex app-server daemon update --from-cli --yes 2>&1)"; then
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && log "[DAEMON] $line"
+        done <<< "$output"
+        log "[SUCCESS] Managed Codex daemon package update finished"
+    else
+        local status=$?
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && log "[DAEMON] $line"
+        done <<< "$output"
+        log "[ERROR] Managed Codex daemon update failed (exit $status)"
+        return "$status"
+    fi
+}
+
+plan_managed_daemon_update() {
+    if daemon_package_selected; then
+        log "[DRY-RUN] Would update the managed Codex daemon package"
+    else
+        log "[DRY-RUN] No managed Codex daemon package selected; nothing to update"
+    fi
+}
+
 prepare_log_file
 mkdir -p "$RELEASES_DIR"
 
@@ -159,12 +195,14 @@ done
 log "[DEBUG] Latest package version: '$latest_version' | Current installed: '${current_version:-<none>}' | Package layout: '$package_install'"
 if [[ "$latest_version" == "$current_version" ]] && $package_install; then
     log "[OK] Codex $current_version is up to date"
+    if $DRY_RUN; then plan_managed_daemon_update; else update_managed_daemon; fi
     $DRY_RUN && cleanup_old_versions
     exit 0
 fi
 if [[ -n "$current_version" && "$latest_version" != "$current_version" ]] \
     && ! version_gt "$latest_version" "$current_version"; then
     log "[OK] Current $current_version >= latest $latest_version, nothing to do"
+    if $DRY_RUN; then plan_managed_daemon_update; else update_managed_daemon; fi
     $DRY_RUN && cleanup_old_versions
     exit 0
 fi
@@ -185,6 +223,7 @@ fi
 
 if $DRY_RUN; then
     log "[DRY-RUN] Would update Codex: ${current_version:-none} -> $latest_version"
+    plan_managed_daemon_update
     cleanup_old_versions
     exit 0
 fi
@@ -208,4 +247,5 @@ if [[ "$installed_version" != "$latest_version" ]]; then
 fi
 
 log "[SUCCESS] Codex package updated: ${current_version:-none} -> $latest_version"
+update_managed_daemon
 cleanup_old_versions

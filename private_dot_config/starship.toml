@@ -90,7 +90,7 @@ format = "[@$hostname ]($style) "
 
 [time]
 disabled = false
-time_format = "%H:%M:%S"
+time_format = "%H:%M:%S %Z"
 format = "[$time]($style)"
 style = "fg:66"
 
