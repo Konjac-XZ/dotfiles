@@ -29,6 +29,7 @@ LOG_FILE="${CODEX_LOG_FILE:-$XDG_DATA_HOME/codex/update.log}"
 STANDALONE_ROOT="${CODEX_STANDALONE_ROOT:-${CODEX_HOME:-$HOME/.codex}/packages/standalone}"
 RELEASES_DIR="$STANDALONE_ROOT/releases"
 DAEMON_ROOT="${CODEX_DAEMON_ROOT:-${CODEX_HOME:-$HOME/.codex}/packages/app-server-daemon}"
+IDLE_PROBE="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/codex-daemon-idle"
 
 case "$(uname -m):$(uname -s)" in
     x86_64:Linux) CODEX_TARGET="${CODEX_TARGET:-x86_64-unknown-linux-musl}" ;;
@@ -115,11 +116,38 @@ daemon_package_selected() {
     [[ -L "$DAEMON_ROOT/current" && -x "$DAEMON_ROOT/current/bin/codex" ]]
 }
 
+daemon_versions_current() {
+    jq -e '
+        (.cliVersion | type == "string" and length > 0)
+        and .managedCodexVersion == .cliVersion
+        and (.status != "running" or .appServerVersion == .cliVersion)
+    ' <<< "$1" >/dev/null
+}
+
 update_managed_daemon() {
     if ! daemon_package_selected; then
         log "[OK] No managed Codex daemon package selected; skipping daemon update"
         return
     fi
+
+    local daemon_info socket_path probe_output
+    if ! daemon_info="$(codex app-server daemon version 2>&1)"; then
+        log "[SKIP] Could not read managed daemon status; retrying on the next run"
+        return
+    fi
+    if daemon_versions_current "$daemon_info"; then
+        log "[OK] Managed daemon already matches the CLI version; no daemon update needed"
+        return
+    fi
+    if ! socket_path="$(jq -er '.socketPath | select(type == "string" and length > 0)' <<< "$daemon_info")"; then
+        log "[SKIP] Managed daemon socket is unavailable; retrying on the next run"
+        return
+    fi
+    if ! probe_output="$(python3 "$IDLE_PROBE" "$socket_path" 2>&1)"; then
+        log "[SKIP] Managed daemon is not confirmed idle ($probe_output); retrying on the next run"
+        return
+    fi
+    log "[DAEMON] $probe_output"
 
     log "[UPDATE] Updating the managed Codex daemon package"
     local output line
@@ -139,10 +167,18 @@ update_managed_daemon() {
 }
 
 plan_managed_daemon_update() {
-    if daemon_package_selected; then
-        log "[DRY-RUN] Would update the managed Codex daemon package"
-    else
+    if ! daemon_package_selected; then
         log "[DRY-RUN] No managed Codex daemon package selected; nothing to update"
+        return
+    fi
+
+    local daemon_info
+    if ! daemon_info="$(codex app-server daemon version 2>&1)"; then
+        log "[DRY-RUN] Could not determine managed daemon version"
+    elif daemon_versions_current "$daemon_info"; then
+        log "[DRY-RUN] Managed daemon already matches the CLI version; no update needed"
+    else
+        log "[DRY-RUN] Would update the managed Codex daemon package when idle"
     fi
 }
 

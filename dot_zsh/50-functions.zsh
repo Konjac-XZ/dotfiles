@@ -197,25 +197,19 @@ function y() {
 	rm -f -- "$tmp"
 }
 
-function codex-hard-restart() {
+function _codex-hard-stop() {
   emulate -L zsh
 
   local codex_bin="${commands[codex]}"
-  local control_socket="$HOME/.codex/app-server-control/app-server-control.sock"
   local process_pattern='[c]odex.*app-server|[c]odex-code-mode-host'
-  local server_pattern='[c]odex.*app-server.*--listen'
-  local cli_version daemon_status
   local attempt
 
   if [[ -z "$codex_bin" || ! -x "$codex_bin" ]]; then
-    print -u2 'codex-hard-restart: codex executable not found'
+    print -u2 'codex-hard-stop: codex executable not found'
     return 127
   fi
 
-  cli_version=$("$codex_bin" --version 2>/dev/null)
-  cli_version=${cli_version#codex-cli }
-  print "Restarting Codex app-server, proxy, and code-mode-host (${cli_version})..."
-
+  # The daemon command knows the selected managed package and owns socket cleanup.
   "$codex_bin" app-server daemon stop >/dev/null 2>&1 || true
   command pkill -TERM -u "$EUID" -f "$process_pattern" 2>/dev/null || true
 
@@ -227,35 +221,44 @@ function codex-hard-restart() {
   if command pgrep -u "$EUID" -f "$process_pattern" >/dev/null 2>&1; then
     print 'Processes did not stop after SIGTERM; sending SIGKILL...'
     command pkill -KILL -u "$EUID" -f "$process_pattern" 2>/dev/null || true
-    command sleep 0.2
+    for attempt in {1..20}; do
+      command pgrep -u "$EUID" -f "$process_pattern" >/dev/null 2>&1 || break
+      command sleep 0.1
+    done
   fi
 
-  # A GUI client may immediately respawn the daemon. Accept it only when it
-  # came from the currently installed Codex release.
-  if command pgrep -u "$EUID" -f "$server_pattern" >/dev/null 2>&1; then
-    daemon_status=$("$codex_bin" app-server daemon version 2>/dev/null)
-    if [[ "$daemon_status" == *\"appServerVersion\":\"${cli_version}\"* ]]; then
-      print -r -- "$daemon_status"
-      print 'Codex services were respawned successfully.'
-      return 0
-    fi
-
-    print -u2 'codex-hard-restart: a stale app-server respawned during cleanup'
+  if command pgrep -u "$EUID" -f "$process_pattern" >/dev/null 2>&1; then
+    print -u2 'codex-hard-stop: Codex processes are still running'
     command pgrep -a -u "$EUID" -f "$process_pattern" >&2
     return 1
   fi
 
-  command rm -f -- "$control_socket"
+  return 0
+}
+
+function codex-hard-stop() {
+  emulate -L zsh
+
+  print 'Stopping Codex app-server, proxy, and code-mode-host...'
+  _codex-hard-stop || return
+  print 'Codex services stopped successfully.'
+}
+
+function codex-hard-restart() {
+  emulate -L zsh
+
+  local codex_bin="${commands[codex]}"
+  local daemon_status
+
+  print 'Restarting Codex app-server, proxy, and code-mode-host...'
+  _codex-hard-stop || return
+
   "$codex_bin" app-server daemon start >/dev/null || return
-  command sleep 0.5
 
-  daemon_status=$("$codex_bin" app-server daemon version 2>/dev/null)
-  print -r -- "$daemon_status"
-  if [[ "$daemon_status" != *\"status\":\"running\"* || \
-        "$daemon_status" != *\"appServerVersion\":\"${cli_version}\"* ]]; then
-    print -u2 'codex-hard-restart: daemon did not restart on the current CLI version'
+  daemon_status=$("$codex_bin" app-server daemon version 2>/dev/null) || {
+    print -u2 'codex-hard-restart: daemon did not start'
     return 1
-  fi
-
+  }
+  print -r -- "$daemon_status"
   print 'Codex services restarted successfully.'
 }
